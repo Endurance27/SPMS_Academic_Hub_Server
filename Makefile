@@ -32,80 +32,78 @@ dev-install:
 	pre-commit install
 
 up:
-	docker-compose up -d
+	docker compose up -d
 	@echo "${GREEN}All services started!${RESET}"
 	@echo "API: http://localhost:8000"
 	@echo "Docs: http://localhost:8000/api/v1/docs"
-	@echo "Flower: http://localhost:5555"
-	@echo "Kibana: http://localhost:5601"
 
 down:
-	docker-compose down
+	docker compose down
 	@echo "${YELLOW}All services stopped${RESET}"
 
 restart: ## Restart all services
-	docker-compose restart
+	docker compose restart
 	@echo "${GREEN}All services restarted!${RESET}"
 
 logs: ## View logs from all services
-	docker-compose logs -f
+	docker compose logs -f
 
 logs-api: ## View API logs
-	docker-compose logs -f api
+	docker compose logs -f api
 
 logs-celery: ## View Celery worker logs
-	docker-compose logs -f celery_worker
+	docker compose logs -f celery_worker
 
 logs-db: ## View PostgreSQL logs
-	docker-compose logs -f postgres
+	docker compose logs -f postgres
 
 build: ## Build Docker images
-	docker-compose build
+	docker compose build
 	@echo "${GREEN}Docker images built!${RESET}"
 
 ps: ## List running containers
-	docker-compose ps
+	docker compose ps
 
 # ============================================================================
 # Database Commands
 # ============================================================================
 init-db: ## Initialize database tables
-	docker-compose exec -T -u $$(id -u):$$(id -g) -e PYTHONPATH=/app api python scripts/init_db.py
+	docker compose exec -T -e PYTHONPATH=/app api python scripts/init_db.py
 	@echo "${GREEN}Database initialized!${RESET}"
 
 migrate: ## Run database migrations
-	docker-compose exec -T -u $$(id -u):$$(id -g) api alembic upgrade head
+	docker compose exec -T api alembic upgrade head
 	@echo "${GREEN}Migrations applied!${RESET}"
 
 migrate-create: ## Create new migration
 	@read -p "Enter migration message: " msg; \
-	docker-compose exec -T -u $$(id -u):$$(id -g) api alembic revision --autogenerate -m "$$msg"
+	docker compose exec -T api alembic revision --autogenerate -m "$$msg"
 	@echo "${GREEN}Migration created!${RESET}"
 
 migrate-rollback: ## Rollback last migration
-	docker-compose exec -T -u $$(id -u):$$(id -g) api alembic downgrade -1
+	docker compose exec -T api alembic downgrade -1
 	@echo "${YELLOW}Rolled back last migration${RESET}"
 
 migrate-history: ## View migration history
-	docker-compose exec -T -u $$(id -u):$$(id -g) api alembic history
+	docker compose exec -T api alembic history
 
 migrate-current: ## Show current migration version
-	docker-compose exec -T -u $$(id -u):$$(id -g) api alembic current
+	docker compose exec -T api alembic current
 
 seed: ## Seed database with initial data
-	docker-compose exec -T -u $$(id -u):$$(id -g) -e PYTHONPATH=/app api python scripts/seed_data.py
+	docker compose exec -T -e PYTHONPATH=/app api python scripts/seed_data.py
 	@echo "${GREEN}Database seeded with demo data!${RESET}"
 
 seed-permissions: ## Seed permissions and roles
-	docker-compose exec -T -u $$(id -u):$$(id -g) -e PYTHONPATH=/app api python scripts/seed_permissions.py
+	docker compose exec -T -e PYTHONPATH=/app api python scripts/seed_permissions.py
 	@echo "${GREEN}Permissions and roles seeded!${RESET}"
 
 db-shell: ## Open PostgreSQL shell
-	docker-compose exec postgres psql -U app_user -d app_db
+	docker compose exec postgres psql -U app_user -d app_db
 
 db-backup: ## Backup database
 	@mkdir -p backups
-	@docker-compose exec -T postgres pg_dump -U app_user app_db > backups/app_backup_$$(date +%Y%m%d_%H%M%S).sql
+	@docker compose exec -T postgres pg_dump -U app_user app_db > backups/app_backup_$$(date +%Y%m%d_%H%M%S).sql
 	@echo "${GREEN}Database backed up to backups/${RESET}"
 
 db-restore: ## Restore database from backup (use: make db-restore FILE=backup.sql)
@@ -113,7 +111,7 @@ db-restore: ## Restore database from backup (use: make db-restore FILE=backup.sq
 		echo "${YELLOW}Please specify backup file: make db-restore FILE=backup.sql${RESET}"; \
 		exit 1; \
 	fi
-	docker-compose exec -T postgres psql -U app_user -d app_db < $(FILE)
+	docker compose exec -T postgres psql -U app_user -d app_db < $(FILE)
 	@echo "${GREEN}Database restored from $(FILE)${RESET}"
 
 # ============================================================================
@@ -221,17 +219,17 @@ ipython: ## Open IPython shell
 # Production
 # ============================================================================
 prod-up: ## Start production services
-	docker-compose -f docker-compose.prod.yml up -d
+	docker compose -f docker-compose.prod.yml up -d
 	@echo "${GREEN}Production services started!${RESET}"
 
 prod-down: ## Stop production services
-	docker-compose -f docker-compose.prod.yml down
+	docker compose -f docker-compose.prod.yml down
 
 prod-logs: ## View production logs
-	docker-compose -f docker-compose.prod.yml logs -f
+	docker compose -f docker-compose.prod.yml logs -f
 
 prod-build: ## Build production images
-	docker-compose -f docker-compose.prod.yml build
+	docker compose -f docker-compose.prod.yml build
 
 prod-deploy: prod-build prod-down prod-up migrate seed-permissions ## Full production deployment
 	@echo "${GREEN}Production deployment complete!${RESET}"
@@ -242,14 +240,14 @@ prod-deploy: prod-build prod-down prod-up migrate seed-permissions ## Full produ
 health: ## Check health of all services
 	@echo "${YELLOW}Checking service health...${RESET}"
 	@curl -f http://localhost:8000/health && echo "${GREEN}API: Healthy${RESET}" || echo "${RED}API: Unhealthy${RESET}"
-	@docker-compose exec postgres pg_isready && echo "${GREEN}PostgreSQL: Healthy${RESET}" || echo "${RED}PostgreSQL: Unhealthy${RESET}"
-	@docker-compose exec redis redis-cli ping && echo "${GREEN}Redis: Healthy${RESET}" || echo "${RED}Redis: Unhealthy${RESET}"
+	@docker compose exec postgres pg_isready && echo "${GREEN}PostgreSQL: Healthy${RESET}" || echo "${RED}PostgreSQL: Unhealthy${RESET}"
+	@docker compose exec redis redis-cli ping && echo "${GREEN}Redis: Healthy${RESET}" || echo "${RED}Redis: Unhealthy${RESET}"
 
 stats: ## Show Docker stats
 	docker stats --no-stream
 
 top: ## Show running processes in containers
-	docker-compose top
+	docker compose top
 
 # ============================================================================
 # Cleanup
@@ -266,7 +264,7 @@ clean: ## Remove Python cache files
 	@echo "${GREEN}Cleanup complete!${RESET}"
 
 clean-docker: ## Remove all Docker containers and images
-	docker-compose down --rmi all --volumes --remove-orphans
+	docker compose down --rmi all --volumes --remove-orphans
 	@echo "${YELLOW}All Docker resources cleaned${RESET}"
 
 clean-all: clean clean-docker ## Remove all generated files and Docker resources
@@ -298,8 +296,8 @@ upgrade-deps: ## Upgrade all dependencies
 	pip install --upgrade pip
 	pip list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1 | xargs -n1 pip install -U
 
-create-admin: ## Create admin user interactively
-	python scripts/create_admin.py
+create-admin: ## Create admin user interactively (runs in Docker)
+	docker compose exec -e PYTHONPATH=/app api python scripts/create_admin.py
 
 # ============================================================================
 # Quick Start
@@ -311,8 +309,6 @@ quick-start: install up init-db migrate seed seed-permissions ## Quick start for
 	@echo ""
 	@echo "API: http://localhost:8000"
 	@echo "API Docs: http://localhost:8000/api/v1/docs"
-	@echo "Flower: http://localhost:5555"
-	@echo "Kibana: http://localhost:5601"
 	@echo ""
 	@echo "Default Admin Credentials:"
 	@echo "Email: admin@example.com"
