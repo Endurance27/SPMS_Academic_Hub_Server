@@ -1,34 +1,20 @@
-# Backend Service Template
+# SPMS Academic Hub
 
-A reusable, production-ready FastAPI backend starter with layered architecture, auth/RBAC foundations, async workers, and infrastructure defaults.
+Backend application with layered architecture, authentication, role-based access control, and async processing.
 
-## Template Setup Guide
+## Features
 
-If you want to use this architecture as a reusable starter for future projects, follow:
-
-- `TEMPLATE_README.md` for the end-to-end template workflow
-- `.env.example` for environment variable setup
-
-## Domain-Specific Notes
-
-Some modules in this bootstrap are domain examples (for example, parts of `app/integrations` and vetting/report workflows). Keep what you need and replace/remove the rest for your product domain.
-
-## 🚀 Features
-
-- **Multi-Role Authentication**: Administrator, Client, and Applicant roles with RBAC
-- **2FA Security**: SMS and Google Authenticator support
+- **Multi-Role Authentication**: Role-based access control (RBAC)
+- **2FA Security**: TOTP and SMS support
 - **Async Processing**: RabbitMQ + Celery for background tasks
 - **Real-time Caching**: Redis for session management and caching
-- **External Integrations**:
-  - Pluggable third-party adapters (included examples can be replaced)
-  - Identity/verification API integration pattern
-  - Geocoding/location API integration pattern
-- **Automated Report Generation**: PDF reports with executive summaries
 - **Comprehensive Logging**: ELK Stack integration
-- **CI/CD**: GitHub Actions for automated testing and deployment
-- **Production Ready**: Docker, Nginx, PostgreSQL
+- **CI/CD Ready**: Docker, Nginx, PostgreSQL
+- **Email Integration**: SMTP-based email dispatch
+- **Audit Trails**: Complete audit logging system
+- **Notifications**: In-app notification system
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Python 3.11+
 - Docker & Docker Compose
@@ -36,13 +22,13 @@ Some modules in this bootstrap are domain examples (for example, parts of `app/i
 - Redis 7+
 - RabbitMQ 3+
 
-## 🛠️ Installation
+## Installation
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/backend-template.git
-cd backend-template
+git clone <repository-url>
+cd SPMS_Academic_Hub_Server
 ```
 
 ### 2. Environment Setup
@@ -76,10 +62,10 @@ make migrate
 
 # Seed initial data
 make seed
+make seed-permissions
 ```
 
-
-## 🔐 Security Features
+## Security Features
 
 ### Authentication & Authorization
 
@@ -112,7 +98,7 @@ Body: {"code": "123456"}
 - At least one digit
 - Bcrypt hashing with 12 rounds
 
-## 📊 API Endpoints
+## API Endpoints
 
 ### Authentication
 
@@ -125,23 +111,11 @@ POST   /api/v1/auth/2fa/verify     # Verify 2FA
 POST   /api/v1/auth/2fa/enable     # Enable 2FA
 ```
 
-### Applications
+### Users
 
 ```bash
-POST   /api/v1/applications        # Create application
-GET    /api/v1/applications        # List applications
-GET    /api/v1/applications/:id    # Get application details
-PATCH  /api/v1/applications/:id    # Update application
-POST   /api/v1/applications/:id/submit  # Submit for processing
-POST   /api/v1/applications/:id/documents # Upload documents
-```
-
-### Reports
-
-```bash
-GET    /api/v1/reports/:id         # Get report
-GET    /api/v1/reports/:id/pdf     # Download PDF
-POST   /api/v1/reports/:id/generate # Generate report
+GET    /api/v1/users/me            # Get current user
+PATCH  /api/v1/users/me            # Update current user
 ```
 
 ### Admin
@@ -151,11 +125,34 @@ POST   /api/v1/admin/users         # Create user
 GET    /api/v1/admin/users         # List users
 PATCH  /api/v1/admin/users/:id     # Update user
 DELETE /api/v1/admin/users/:id     # Delete user
-POST   /api/v1/admin/clients       # Create client
 GET    /api/v1/admin/audit-logs    # View audit logs
 ```
 
-## 🧪 Testing
+### Roles & Permissions
+
+```bash
+POST   /api/v1/roles               # Create role
+GET    /api/v1/roles               # List roles
+PATCH  /api/v1/roles/:id           # Update role
+DELETE /api/v1/roles/:id           # Delete role
+```
+
+### Notifications
+
+```bash
+GET    /api/v1/notifications       # List notifications
+PATCH  /api/v1/notifications/:id  # Mark as read
+```
+
+### Password
+
+```bash
+POST   /api/v1/password/forgot    # Request password reset
+POST   /api/v1/password/reset     # Reset password
+POST   /api/v1/password/change    # Change password
+```
+
+## Testing
 
 ### Run All Tests
 
@@ -182,16 +179,9 @@ pytest tests/integration -v
 pytest tests/unit/test_services/test_auth_service.py -v
 ```
 
-### Test Database
+## Celery Tasks
 
-Tests use a separate test database configured in `conftest.py`:
-
-- Database: `test_db`
-- Redis DB: `1` (separate from production)
-
-## 🔄 Celery Tasks
-
-### Background Check Tasks
+### Background Tasks
 
 ```python
 # Start Celery worker
@@ -205,16 +195,7 @@ make flower
 # Access: http://localhost:5555
 ```
 
-### Task Types
-
-1. **check_ghana_card** - Verify Ghana Card with NIA
-2. **check_credit_history** - Credit check via XDS Data
-3. **geocode_addresses** - Geocode addresses using Google Maps
-4. **verify_employment** - Verify employment history
-5. **verify_education** - Verify education credentials
-6. **generate_report** - Generate final PDF report
-
-## 📝 Database Migrations
+## Database Migrations
 
 ### Create Migration
 
@@ -234,7 +215,7 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
-## 🚢 Deployment
+## Deployment
 
 ### Development
 
@@ -281,36 +262,25 @@ docker-compose exec postgres pg_isready
 docker-compose exec redis redis-cli ping
 ```
 
-## 📊 Monitoring
-
-### Prometheus Metrics
-
-Metrics exposed at `/metrics`:
-
-- Request count
-- Request duration
-- Active sessions
-- Task queue length
-
-### Kibana Dashboard
-
-Access Kibana at `http://localhost:5601` to view:
-
-- Application logs
-- Error tracking
-- Performance metrics
-- User activity
+## Monitoring
 
 ### Flower (Celery Monitoring)
 
 Access Flower at `http://localhost:5555` to:
-
 - Monitor task execution
 - View task history
 - Inspect workers
 - Manage task queues
 
-## 🔒 Security Best Practices
+### Kibana Dashboard
+
+Access Kibana at `http://localhost:5601` to view:
+- Application logs
+- Error tracking
+- Performance metrics
+- User activity
+
+## Security Best Practices
 
 1. **Environment Variables**: Never commit `.env` files
 2. **Secrets Management**: Use secret management services in production
@@ -321,12 +291,11 @@ Access Flower at `http://localhost:5555` to:
 7. **XSS Protection**: FastAPI auto-escapes outputs
 8. **CORS**: Configure allowed origins properly
 
-## 📚 API Documentation
+## API Documentation
 
 ### Swagger UI
 
 Access interactive API docs at:
-
 ```
 http://localhost:8000/api/v1/docs
 ```
@@ -334,119 +303,28 @@ http://localhost:8000/api/v1/docs
 ### ReDoc
 
 Alternative API documentation:
-
 ```
 http://localhost:8000/api/v1/redoc
 ```
 
-## 🤝 Contributing
+## Default Credentials (Development)
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+Default seeded admin credentials:
+- Email: `admin@example.com`
+- Password: `Admin@123`
 
-### Code Quality
+**Important**: Change default passwords in production!
 
-Before submitting PR:
+## Useful Make Commands
 
-```bash
-# Format code
-make format
+- `make up` / `make down` / `make restart`
+- `make logs` / `make logs-api` / `make logs-db`
+- `make migrate` / `make migrate-create` / `make migrate-rollback`
+- `make seed` / `make seed-permissions`
+- `make test` / `make coverage`
+- `make lint` / `make format`
 
-# Run linters
-make lint
-
-# Run tests
-make test
-```
-
-
-
-## 🆘 Support
-
-For issues and questions:
-
-- **Issues**: GitHub Issues
-<!-- - **Email**: support@backend-template.com
-- **Documentation**: [docs.backend-template.com](https://docs.backend-template.com) -->
-
-## 🎯 Roadmap
-
-### Phase 1 (Current)
-
-- ✅ Core authentication system
-- ✅ Application management
-- ✅ Background checks integration
-- ✅ Report generation
-
-### Phase 2
-
-- [ ] Mobile application (React Native)
-- [ ] Real-time notifications (WebSockets)
-- [ ] Advanced analytics dashboard
-- [ ] Bulk processing
-
-### Phase 3
-
-- [ ] AI-powered risk assessment
-- [ ] Blockchain verification
-- [ ] Multi-tenant architecture
-- [ ] International expansion
-
-## 📞 Default Credentials (Development)
-
-
-
-## 🏁 Quick Start Guide
-
-### For Developers
-
-```bash
-# 1. Clone and setup
-git clone https://github.com/your-org/backend-template.git
-cd backend-template
-cp .env.example .env
-
-# 2. Start services
-make up
-
-# 3. Initialize database
-make init-db
-make migrate
-make seed
-
-# 4. Run tests
-make test
-
-# 5. Access application
-# API: http://localhost:8000
-# Docs: http://localhost:8000/api/v1/docs
-# Flower: http://localhost:5555
-# Kibana: http://localhost:5601
-```
-
-### For Production Deployment
-
-```bash
-# 1. Configure production environment
-cp .env.example .env.production
-# Edit .env.production with production values
-
-# 2. Build and deploy
-docker-compose -f docker-compose.prod.yml build
-docker-compose -f docker-compose.prod.yml up -d
-
-# 3. Initialize production database
-docker-compose -f docker-compose.prod.yml exec api alembic upgrade head
-docker-compose -f docker-compose.prod.yml exec api python scripts/seed_data.py
-
-# 4. Verify deployment
-curl https://your-domain.com/health
-```
-
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Database Connection Issues
 
@@ -500,3 +378,47 @@ alembic history
 alembic downgrade -1
 alembic upgrade head
 ```
+
+## Project Structure
+
+```text
+app/
+  api/              # API endpoints
+  core/             # Core functionality (config, security, database)
+  integrations/     # External service integrations
+  models/           # Database models
+  repositories/     # Data access layer
+  schemas/          # Pydantic schemas
+  services/         # Business logic
+  tasks/            # Celery tasks
+alembic/            # Database migrations
+docker/             # Docker configuration
+scripts/            # Utility scripts
+tests/              # Test suite
+```
+
+## Contributing
+
+1. Create feature branch (`git checkout -b feature/amazing-feature`)
+2. Commit changes (`git commit -m 'Add amazing feature'`)
+3. Push to branch (`git push origin feature/amazing-feature`)
+4. Open Pull Request
+
+### Code Quality
+
+Before submitting PR:
+
+```bash
+# Format code
+make format
+
+# Run linters
+make lint
+
+# Run tests
+make test
+```
+
+## Support
+
+For issues and questions, please open an issue on the repository.

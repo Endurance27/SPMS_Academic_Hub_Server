@@ -20,7 +20,7 @@ help:
 	@echo "  make format        - Format code"
 	@echo "  make migrate       - Run database migrations"
 	@echo "  make seed          - Seed database with initial data"
-	@echo '${GREEN}Backend Template - Available Commands${RESET}'
+	@echo '${GREEN}SPMS Academic Hub - Available Commands${RESET}'
 	@echo ''
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "${YELLOW}%-20s${RESET} %s\n", $$1, $$2}'
 
@@ -306,7 +306,7 @@ create-admin: ## Create admin user interactively
 # ============================================================================
 quick-start: install up init-db migrate seed seed-permissions ## Quick start for new setup
 	@echo "${GREEN}==================================================${RESET}"
-	@echo "${GREEN}Backend Template is ready!${RESET}"
+	@echo "${GREEN}SPMS Academic Hub is ready!${RESET}"
 	@echo "${GREEN}==================================================${RESET}"
 	@echo ""
 	@echo "API: http://localhost:8000"

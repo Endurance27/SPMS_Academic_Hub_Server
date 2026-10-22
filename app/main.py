@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Reusable FastAPI backend template",
+    description="SPMS Academic Hub",
     version=settings.API_VERSION,
     docs_url=f"/docs",
     redoc_url=f"/api/{settings.API_VERSION}/redoc",

@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "Backend Template"
+    APP_NAME: str = "SPMS Academic Hub"
     APP_ENV: str = "development"
     DEBUG: bool = True
     SECRET_KEY: str
@@ -49,11 +49,6 @@ class Settings(BaseSettings):
     OTP_EXPIRE_MINUTES: int = 5
 
     # External APIs
-    XDS_DATA_API_KEY: Optional[str] = None
-    XDS_DATA_BASE_URL: Optional[str] = None
-    GHANA_CARD_API_KEY: Optional[str] = None
-    GHANA_CARD_BASE_URL: Optional[str] = None
-    GHANA_POST_GPS_BASE_URL: Optional[str] = None
     GOOGLE_MAPS_API_KEY: Optional[str] = None
 
     # File Upload
