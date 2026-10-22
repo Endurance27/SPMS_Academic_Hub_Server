@@ -421,4 +421,4 @@ make test
 
 ## Support
 
-For issues and questions, please open an issue on the repository..
+For issues and questions, please open an issue on the repository.
