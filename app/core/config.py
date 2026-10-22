@@ -58,20 +58,15 @@ class Settings(BaseSettings):
 
     # Logging
     LOG_LEVEL: str = "INFO"
-    LOGSTASH_HOST: str = "logstash"
+    LOGSTASH_HOST: Optional[str] = None
     LOGSTASH_PORT: int = 5000
 
     # Email
-    SMTP_HOST: str
+    SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 587
-    SMTP_USER: str
-    SMTP_PASSWORD: str
-    EMAIL_FROM: str
-
-    RABBITMQ_USER: str = "app_rmq"
-    RABBITMQ_PASS: str = "rmq_pass"
-    RABBITMQ_HOST: str = "rabbitmq"
-    RABBITMQ_PORT: int = 5672
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    EMAIL_FROM: Optional[str] = None
 
     # Security
     BCRYPT_ROUNDS: int = 12

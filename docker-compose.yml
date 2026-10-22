@@ -9,7 +9,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app_user} -d ${POSTGRES_DB:-app_db}"]
       interval: 10s
@@ -30,55 +30,6 @@ services:
       timeout: 5s
       retries: 5
 
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: spms_rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-app_rmq}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-rmq_pass}
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    healthcheck:
-      test: rabbitmq-diagnostics -q ping
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: spms_elasticsearch
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
-
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.11.0
-    container_name: spms_logstash
-    volumes:
-      - ./docker/logstash/pipeline:/usr/share/logstash/pipeline
-    ports:
-      - "${LOGSTASH_HOST_PORT:-5001}:5000"
-    depends_on:
-      - elasticsearch
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.11.0
-    container_name: spms_kibana
-    environment:
-      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-    ports:
-      - "5601:5601"
-    depends_on:
-      - elasticsearch
-
   api:
     build:
       context: .
@@ -95,9 +46,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -118,7 +70,6 @@ services:
     depends_on:
       - postgres
       - redis
-      - rabbitmq
 
   celery_beat:
     build:
@@ -133,41 +84,7 @@ services:
     depends_on:
       - postgres
       - redis
-      - rabbitmq
-
-  flower:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.celery
-    container_name: spms_flower
-    command: celery -A app.tasks.celery_app flower --port=5555
-    ports:
-      - "5555:5555"
-    env_file:
-      - .env
-    depends_on:
-      - rabbitmq
-      - celery_worker
-
-  nginx:
-    image: nginx:alpine
-    container_name: spms_nginx
-    volumes:
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./static:/usr/share/nginx/html/static:ro
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      - api
 
 volumes:
   postgres_data:
   redis_data:
-  rabbitmq_data:
-  elasticsearch_data:
-
-networks:
-  default:
-    name: spms_network
-    external: true
