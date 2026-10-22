@@ -1,0 +1,188 @@
+services:
+  # Render Key Value (Redis-compatible)
+  - type: keyvalue
+    name: redis-cache
+    plan: starter
+
+  # FastAPI Web Service
+  - type: web
+    name: fastapi-app
+    runtime: python
+    pythonVersion: 3.11
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: false
+      - key: POSTGRES_HOST
+        value: postgres-db
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: redis-cache
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: redis-cache
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: redis-cache
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: postgres-db
+          property: connectionString
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: postgres-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: postgres-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: postgres-db
+          property: database
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: ALLOWED_HOSTS
+        value: "[\"*\"]"
+      - key: CORS_ORIGINS
+        value: "[]"
+
+  # Celery Worker
+  - type: worker
+    name: celery-worker
+    runtime: python
+    pythonVersion: 3.11
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.tasks.celery_app worker --loglevel=info
+    numInstances: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: APP_ENV
+        value: production
+      - key: POSTGRES_HOST
+        value: postgres-db
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: redis-cache
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: redis-cache
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: redis-cache
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: postgres-db
+          property: connectionString
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: postgres-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: postgres-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: postgres-db
+          property: database
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: SECRET_KEY
+      - key: JWT_SECRET_KEY
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: JWT_SECRET_KEY
+      - key: REDIS_PASSWORD
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: REDIS_PASSWORD
+      - key: SMTP_HOST
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: SMTP_HOST
+      - key: SMTP_PORT
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: SMTP_PORT
+      - key: SMTP_USER
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: SMTP_USER
+      - key: SMTP_PASSWORD
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: SMTP_PASSWORD
+      - key: EMAIL_FROM
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: EMAIL_FROM
+
+  # Flower (Celery Monitoring - Optional)
+  - type: web
+    name: flower-monitor
+    runtime: python
+    pythonVersion: 3.11
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.tasks.celery_app flower --port=$PORT
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: CELERY_BROKER_URL
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: web
+          name: fastapi-app
+          envVarKey: CELERY_RESULT_BACKEND
+
+databases:
+  # PostgreSQL Database
+  - name: postgres-db
+    engine: postgres
+    postgresMajorVersion: "15"
+    plan: starter
