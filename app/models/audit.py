@@ -1,7 +1,5 @@
 import uuid
-from datetime import datetime
-
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, String
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -27,7 +25,7 @@ class AuditLog(Base):
     changes = Column(JSON)  # Before/after for updates
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=func.now(), index=True)
 
     # Relationships
     user = relationship("User", back_populates="audit_logs", foreign_keys=[user_id])

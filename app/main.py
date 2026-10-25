@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 
@@ -15,11 +16,11 @@ for _k in ("ALLOWED_HOSTS", "CORS_ORIGINS", "ALLOWED_EXTENSIONS"):
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from loguru import logger
 
 from app.api.v1.router import api_router
@@ -65,7 +66,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="SPMS Academic Hub",
     version=settings.API_VERSION,
-    docs_url=f"/docs",
+    docs_url="/docs",
     redoc_url=f"/api/{settings.API_VERSION}/redoc",
     openapi_url=f"/api/{settings.API_VERSION}/openapi.json",
     lifespan=lifespan,
@@ -85,6 +86,34 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 
 # GZip Middleware
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+# Docs Authentication Middleware
+if settings.DOCS_USERNAME and settings.DOCS_PASSWORD:
+    @app.middleware("http")
+    async def docs_auth_middleware(request: Request, call_next):
+        if request.url.path in ["/docs", "/redoc", "/api/v1/docs", "/api/v1/redoc", "/api/v1/openapi.json"]:
+            auth = request.headers.get("authorization")
+            if not auth or not auth.startswith("Basic "):
+                return Response(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    headers={"WWW-Authenticate": 'Basic realm="SPMS API Docs"'},
+                )
+            try:
+                credentials_decoded = base64.b64decode(auth.split(" ")[1]).decode("utf-8")
+                username, password = credentials_decoded.split(":", 1)
+                if username != settings.DOCS_USERNAME or password != settings.DOCS_PASSWORD:
+                    return Response(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        headers={"WWW-Authenticate": 'Basic realm="SPMS API Docs"'},
+                    )
+            except Exception:
+                return Response(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    headers={"WWW-Authenticate": 'Basic realm="SPMS API Docs"'},
+                )
+        response = await call_next(request)
+        return response
 
 
 # Exception Handlers

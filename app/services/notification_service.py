@@ -31,9 +31,9 @@ class NotificationService:
         """Get user notifications"""
         return await self.notification_repo.get_user_notifications(user_id, unread_only)
 
-    async def mark_as_read(self, notification_ids: List[uuid.UUID]) -> None:
+    async def mark_as_read(self, notification_ids: List[uuid.UUID], user_id: uuid.UUID) -> None:
         """Mark notifications as read"""
-        await self.notification_repo.mark_as_read(notification_ids)
+        await self.notification_repo.mark_as_read(notification_ids, user_id)
 
     async def get_unread_count(self, user_id: uuid.UUID) -> int:
         """Get unread notification count"""

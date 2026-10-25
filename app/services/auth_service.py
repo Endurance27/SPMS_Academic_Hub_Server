@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.security import SecurityService
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import LoginResponse
 
@@ -58,11 +58,11 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password"
             )
 
-        if not user.is_active:
+        if user.status != UserStatus.ACTIVE:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive")
 
         # Check if this is the first login before updating the timestamp
-        is_first_time = user.last_login is None
+        is_first_time = user.last_login_at is None
 
         # Reset failed attempts
         await self.user_repo.update_last_login(user.id)

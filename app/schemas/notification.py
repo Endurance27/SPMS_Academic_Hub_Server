@@ -4,33 +4,39 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
-from app.models.notification import NotificationPriority, NotificationType
+from app.models.notification import NotificationCategory, NotificationPriority
 
 
 class NotificationCreate(BaseModel):
-    user_id: uuid.UUID
-    type: NotificationType
-    priority: NotificationPriority
+    recipient_id: Optional[uuid.UUID] = None
     title: str
-    message: str
-    resource_type: Optional[str] = None
-    resource_id: Optional[uuid.UUID] = None
-    action_url: Optional[str] = None
-    data: Optional[Dict[str, Any]] = None
+    detail: str
+    page: Optional[str] = None
+    category: NotificationCategory
+    priority: NotificationPriority = NotificationPriority.MEDIUM
+    audience_role: Optional[str] = None
+    audience_department_id: Optional[uuid.UUID] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[uuid.UUID] = None
 
 
 class NotificationResponse(BaseModel):
     id: uuid.UUID
-    type: NotificationType
-    priority: NotificationPriority
+    recipient_id: Optional[uuid.UUID]
     title: str
-    message: str
-    resource_type: Optional[str]
-    resource_id: Optional[uuid.UUID]
-    action_url: Optional[str]
-    is_read: bool
-    read_at: Optional[datetime]
+    detail: str
+    page: Optional[str]
+    category: NotificationCategory
+    priority: NotificationPriority
+    audience_role: Optional[str]
+    audience_department_id: Optional[uuid.UUID]
+    entity_type: Optional[str]
+    entity_id: Optional[uuid.UUID]
     created_at: datetime
+
+    # Computed fields (not in model directly)
+    is_read: bool = False
+    read_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

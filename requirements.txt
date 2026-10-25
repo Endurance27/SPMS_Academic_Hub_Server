@@ -1,6 +1,7 @@
 # Runtime Dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+python-multipart==0.0.6
 
 # Database
 sqlalchemy==2.0.23
@@ -31,6 +32,7 @@ python-dotenv==1.0.0
 
 # Utilities
 Pillow==10.1.0
+openpyxl==3.1.2
 
 # Logging / Monitoring
 python-json-logger==2.0.7

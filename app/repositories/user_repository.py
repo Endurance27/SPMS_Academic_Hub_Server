@@ -17,8 +17,8 @@ class UserRepository(BaseRepository[User]):
         result = await self.db.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
 
-    async def get_by_phone(self, phone_number: str) -> Optional[User]:
-        result = await self.db.execute(select(User).where(User.phone_number == phone_number))
+    async def get_by_phone(self, phone: str) -> Optional[User]:
+        result = await self.db.execute(select(User).where(User.phone == phone))
         return result.scalar_one_or_none()
 
     async def get_by_id(self, user_id: uuid.UUID) -> Optional[User]:
@@ -29,8 +29,8 @@ class UserRepository(BaseRepository[User]):
         await self.update(
             user_id,
             {
-                "last_login": datetime.now(timezone.utc),
-                "last_activity": datetime.now(timezone.utc),
+                "last_login_at": datetime.now(timezone.utc),
+                "last_activity_at": datetime.now(timezone.utc),
                 "failed_login_attempts": 0,
             },
         )
@@ -46,45 +46,108 @@ class UserRepository(BaseRepository[User]):
     async def get_all(
         self, skip: int = 0, limit: int = 100, filters: Optional[dict] = None
     ) -> list[User]:
+        from app.models.user import UserStatus
+
         query = select(User)
 
         if filters:
             if filters.get("role") is not None:
                 role_value = getattr(filters["role"], "value", filters["role"])
                 query = query.where(User.role == role_value)
+            if filters.get("status") is not None:
+                query = query.where(User.status == filters["status"])
             if filters.get("is_active") is not None:
-                query = query.where(User.is_active == filters["is_active"])
-            if filters.get("last_login") is not None:
-                query = query.where(User.last_login >= filters["last_login"])
-            if filters.get("phone_number") is not None:
-                query = query.where(User.phone_number == filters["phone_number"])
+                # Map is_active to status
+                status = UserStatus.ACTIVE if filters["is_active"] else UserStatus.DISABLED
+                query = query.where(User.status == status)
+            if filters.get("last_login_at") is not None:
+                query = query.where(User.last_login_at >= filters["last_login_at"])
+            if filters.get("phone") is not None:
+                query = query.where(User.phone == filters["phone"])
             if filters.get("email") is not None:
                 query = query.where(User.email == filters["email"])
             if filters.get("name") is not None:
                 name = f"%{filters['name']}%"
-                query = query.where(or_(User.first_name.ilike(name), User.last_name.ilike(name)))
+                query = query.where(User.name.ilike(name))
 
         result = await self.db.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())
 
     async def count(self, filters: Optional[dict] = None) -> int:
+        from app.models.user import UserStatus
+
         query = select(func.count()).select_from(User)
 
         if filters:
             if filters.get("role") is not None:
                 role_value = getattr(filters["role"], "value", filters["role"])
                 query = query.where(User.role == role_value)
+            if filters.get("status") is not None:
+                query = query.where(User.status == filters["status"])
             if filters.get("is_active") is not None:
-                query = query.where(User.is_active == filters["is_active"])
-            if filters.get("last_login") is not None:
-                query = query.where(User.last_login >= filters["last_login"])
-            if filters.get("phone_number") is not None:
-                query = query.where(User.phone_number == filters["phone_number"])
+                status = UserStatus.ACTIVE if filters["is_active"] else UserStatus.DISABLED
+                query = query.where(User.status == status)
+            if filters.get("last_login_at") is not None:
+                query = query.where(User.last_login_at >= filters["last_login_at"])
+            if filters.get("phone") is not None:
+                query = query.where(User.phone == filters["phone"])
             if filters.get("email") is not None:
                 query = query.where(User.email == filters["email"])
             if filters.get("name") is not None:
                 name = f"%{filters['name']}%"
-                query = query.where(or_(User.first_name.ilike(name), User.last_name.ilike(name)))
+                query = query.where(User.name.ilike(name))
 
         result = await self.db.execute(query)
+        return result.scalar_one()
+
+    async def get_by_student_number(self, student_number: str) -> Optional[User]:
+        result = await self.db.execute(select(User).where(User.student_number == student_number))
+        return result.scalar_one_or_none()
+
+    async def get_by_staff_id(self, staff_id: str) -> Optional[User]:
+        result = await self.db.execute(select(User).where(User.staff_id == staff_id))
+        return result.scalar_one_or_none()
+
+    async def get_by_department(self, department_id: uuid.UUID, skip: int = 0, limit: int = 100) -> list[User]:
+        result = await self.db.execute(
+            select(User)
+            .where(User.department_id == department_id)
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def get_by_programme(self, programme_id: uuid.UUID, skip: int = 0, limit: int = 100) -> list[User]:
+        result = await self.db.execute(
+            select(User)
+            .where(User.programme_id == programme_id)
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def count_by_department(self, department_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count()).select_from(User).where(User.department_id == department_id)
+        )
+        return result.scalar_one()
+
+    async def count_by_programme(self, programme_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count()).select_from(User).where(User.programme_id == programme_id)
+        )
+        return result.scalar_one()
+
+    async def get_by_role(
+        self, role: "UserRole", skip: int = 0, limit: int = 100
+    ) -> list[User]:
+        result = await self.db.execute(
+            select(User).where(User.role == role).offset(skip).limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def count_by_role(self, role: "UserRole") -> int:
+        result = await self.db.execute(
+            select(func.count()).select_from(User).where(User.role == role)
+        )
         return result.scalar_one()

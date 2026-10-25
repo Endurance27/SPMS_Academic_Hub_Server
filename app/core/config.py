@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     API_VERSION: str = "v1"
     ALLOWED_EXTENSIONS: str = "pdf,jpg,jpeg,png,doc,docx"
 
+    # Documentation Auth
+    DOCS_USERNAME: Optional[str] = None
+    DOCS_PASSWORD: Optional[str] = None
+
     # ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1"]
 
     # Database
