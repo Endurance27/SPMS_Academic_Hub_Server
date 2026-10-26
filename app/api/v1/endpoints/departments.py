@@ -90,7 +90,7 @@ async def create_department(
 @router.get("/{department_id}", response_model=DepartmentDetailResponse)
 async def get_department(
     department_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("departments.view")),
     db: AsyncSession = Depends(get_db)
 ):
     """Get department details"""
@@ -128,7 +128,7 @@ async def get_department(
 async def update_department(
     department_id: UUID,
     data: DepartmentUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("departments.manage")),
     db: AsyncSession = Depends(get_db)
 ):
     """Update department"""

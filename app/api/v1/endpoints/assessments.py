@@ -132,3 +132,50 @@ async def update_invigilators(
     """Update assessment invigilators"""
     service = AssessmentService(db)
     return await service.update_invigilators(assessment_id, invigilators, current_user)
+
+
+@router.get("/export")
+async def export_assessments(
+    status: Optional[str] = Query(None),
+    scope: Optional[str] = Query(None),
+    current_user: User = Depends(require_permission("assessments.view")),
+    db: AsyncSession = Depends(get_db)
+):
+    """Export assessments as CSV"""
+    import io
+    import csv
+    from fastapi.responses import StreamingResponse
+    from sqlalchemy.future import select
+    from app.models.assessment import Assessment
+
+    query = select(Assessment)
+    if status:
+        query = query.where(Assessment.status == status)
+    if current_user.department_id and scope != "central":
+        query = query.where(Assessment.department_id == current_user.department_id)
+
+    query = query.order_by(Assessment.date, Assessment.start_time)
+    result = await db.execute(query)
+    assessments = result.scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Course", "Type", "Date", "Start", "End", "Location", "Status"])
+    for a in assessments:
+        writer.writerow([
+            a.course_code or "",
+            a.assessment_type or "",
+            a.date.strftime("%Y-%m-%d") if a.date else "",
+            a.start_time or "",
+            a.end_time or "",
+            a.location or a.venue_code or "",
+            a.status.value if hasattr(a.status, 'value') else str(a.status),
+        ])
+
+    filename = "my-assessments.csv" if current_user.role.value == "student" else "assessments.csv"
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 async def update_user_status(
     user_id: uuid.UUID,
     data: UserStatusUpdate,
-    current_user: User = Depends(require_permission("user.update")),
+    current_user: User = Depends(require_permission("users.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     user_repo = UserRepository(db)
@@ -27,9 +27,9 @@ async def update_user_status(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if user.role == UserRole.ADMINISTRATOR:
+    if user.role == UserRole.SUPER:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot update administrator status"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot update super admin status"
         )
 
     await user_repo.update(user_id, data.dict(exclude_unset=True))
@@ -40,7 +40,7 @@ async def update_user_status(
 async def update_user_role(
     user_id: uuid.UUID,
     data: UserRoleUpdate,
-    current_user: User = Depends(require_permission("user.update")),
+    current_user: User = Depends(require_permission("users.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     user_repo = UserRepository(db)
@@ -49,9 +49,9 @@ async def update_user_role(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if user.role == UserRole.ADMINISTRATOR:
+    if user.role == UserRole.SUPER:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot update administrator role"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot update super admin role"
         )
 
     await user_repo.update(user_id, data.dict(exclude_unset=True))
@@ -85,7 +85,7 @@ async def get_all_users(
     last_login: Optional[datetime] = Query(None, description="Filter users by last login"),
     phone_number: Optional[str] = Query(None, description="Filter users by phone number"),
     email: Optional[str] = Query(None, description="Filter users by email"),
-    current_user: User = Depends(require_permission("user.view")),
+    current_user: User = Depends(require_permission("users.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     if page < 1:
@@ -129,7 +129,7 @@ async def get_all_users(
 @router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: uuid.UUID,
-    current_user: User = Depends(require_permission("user.view")),
+    current_user: User = Depends(require_permission("users.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     user_repo = UserRepository(db)

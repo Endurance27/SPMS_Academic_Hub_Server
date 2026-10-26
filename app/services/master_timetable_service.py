@@ -125,14 +125,15 @@ class MasterTimetableService:
         # In production, store in Redis with TTL
         # await redis.setex(f"preview:{preview_id}", 1800, json.dumps(preview_data))
 
-        # Check if existing timetable exists
-        existing = await self.repo.get_by_semester_and_level(semester_id, level)
+        # Check if existing timetable(s) exist
         replaces = None
-        if existing:
-            replaces = {
-                "uploaded_at": existing.uploaded_at.isoformat() if existing.uploaded_at else None,
-                "uploaded_by_id": str(existing.uploaded_by_id)
-            }
+        if level:
+            existing = await self.repo.get_by_semester_and_level(semester_id, level)
+            if existing:
+                replaces = {
+                    "uploaded_at": existing.uploaded_at.isoformat() if existing.uploaded_at else None,
+                    "uploaded_by_id": str(existing.uploaded_by_id)
+                }
 
         # Check affected slot requests
         affected_requests = await self._check_affected_requests(semester_id, level, parse_result["entries"])
@@ -198,14 +199,19 @@ class MasterTimetableService:
 
         preview_id = str(uuid.uuid4())
 
+        levels = sorted({e.get("level") for e in filtered_entries if e.get("level") is not None})
+        venues = sorted({e.get("venue_code", e.get("venue", "")) for e in filtered_entries} - {""})
+
         return {
             "preview_id": preview_id,
             "entries": filtered_entries,
             "conflicts": conflicts,
             "summary": {
                 "entry_count": len(filtered_entries),
-                "conflict_count": len(conflicts)
-            }
+                "levels": levels,
+                "venues": venues,
+                "conflict_count": len(conflicts),
+            },
         }
 
     async def publish_department_timetable(
@@ -264,15 +270,15 @@ class MasterTimetableService:
         entries: List[Dict]
     ) -> List[Dict]:
         """Check which slot requests are affected by timetable changes"""
-        # Get pending/approved requests for this semester and level
+        conditions = [
+            SlotRequest.semester_id == semester_id,
+            SlotRequest.status.in_(["Pending", "Approved"]),
+        ]
+        if level:
+            conditions.append(SlotRequest.level == level)
+
         result = await self.db.execute(
-            select(SlotRequest).where(
-                and_(
-                    SlotRequest.semester_id == semester_id,
-                    SlotRequest.level == level,
-                    SlotRequest.status.in_(["Pending", "Approved"])
-                )
-            )
+            select(SlotRequest).where(and_(*conditions))
         )
         requests = result.scalars().all()
 
@@ -298,31 +304,44 @@ class MasterTimetableService:
         semester_id: uuid.UUID,
         entries: List[Dict]
     ) -> List[Dict]:
-        """Check for conflicts with existing master timetable"""
+        """Check for venue clashes between department entries and the master timetable.
+
+        A conflict occurs when a department entry occupies the same
+        venue + day + period as an existing master entry with a
+        different subject (i.e. the venue is already booked).
+        """
         conflicts = []
 
         for entry in entries:
-            # Check if same cell exists in master timetable with different subject
+            venue = entry.get("venue_code", "")
+            if not venue or venue in ("DEPT", "ONLINE"):
+                continue
+
             result = await self.db.execute(
-                select(MasterEntry).where(
+                select(MasterEntry)
+                .join(MasterTimetable, MasterEntry.timetable_id == MasterTimetable.id)
+                .where(
                     and_(
-                        MasterEntry.semester_id == semester_id,
+                        MasterTimetable.semester_id == semester_id,
                         MasterEntry.day == entry["day"],
                         MasterEntry.period == entry["period"],
-                        MasterEntry.venue_code == entry["venue_code"],
-                        MasterEntry.subject != entry["subject"]
+                        MasterEntry.venue_code == venue,
+                        MasterEntry.subject != entry["subject"],
+                        MasterEntry.is_free == False,
                     )
                 )
             )
-            existing = result.scalar_one_or_none()
+            existing = result.scalars().all()
 
-            if existing:
+            for ex in existing:
                 conflicts.append({
+                    "level": ex.level,
                     "day": entry["day"],
                     "period": entry["period"],
-                    "venue": entry["venue_code"],
-                    "existing_subject": existing.subject,
-                    "new_subject": entry["subject"]
+                    "venue": venue,
+                    "existing_subject": ex.subject,
+                    "new_subject": entry["subject"],
+                    "new_level": entry.get("level"),
                 })
 
         return conflicts

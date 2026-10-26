@@ -131,3 +131,81 @@ async def list_records(
     """List attendance records"""
     service = AttendanceService(db)
     return await service.list_records(course_id, student_id, from_date, to_date, current_user)
+
+
+@router.patch("/records/{record_id}")
+async def update_record(
+    record_id: uuid.UUID,
+    record_status: Optional[str] = None,
+    note: Optional[str] = None,
+    current_user: User = Depends(require_permission("attendance.manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update an attendance record"""
+    from sqlalchemy.future import select
+    from app.models.attendance import AttendanceRecord
+
+    result = await db.execute(select(AttendanceRecord).where(AttendanceRecord.id == record_id))
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+
+    if record_status is not None:
+        record.status = record_status
+    if note is not None:
+        record.note = note
+
+    await db.commit()
+    await db.refresh(record)
+    return {"data": {"id": str(record.id), "status": record.status, "note": record.note}}
+
+
+@router.get("/export")
+async def export_attendance(
+    scope: Optional[str] = Query("department"),
+    department_id: Optional[uuid.UUID] = Query(None),
+    course_id: Optional[uuid.UUID] = Query(None),
+    current_user: User = Depends(require_permission("attendance.manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    """Export attendance records as CSV"""
+    import io
+    import csv
+    from fastapi.responses import StreamingResponse
+    from sqlalchemy.future import select
+    from sqlalchemy.orm import selectinload
+    from app.models.attendance import AttendanceRecord, AttendanceSession
+
+    query = (
+        select(AttendanceRecord)
+        .join(AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id)
+        .options(
+            selectinload(AttendanceRecord.student),
+            selectinload(AttendanceRecord.session).selectinload(AttendanceSession.course),
+        )
+    )
+    if scope == "department" and current_user.department_id:
+        dept_id = department_id or current_user.department_id
+        query = query.where(AttendanceSession.department_id == dept_id)
+    if course_id:
+        query = query.where(AttendanceRecord.course_id == course_id)
+
+    query = query.order_by(AttendanceRecord.recorded_at.desc())
+    result = await db.execute(query)
+    records = result.scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Course", "Student", "Date", "Status", "Source"])
+    for r in records:
+        course_code = r.session.course.code if r.session and r.session.course else r.course_id or ""
+        student_name = r.student.name if r.student else ""
+        date_str = r.recorded_at.strftime("%Y-%m-%d") if r.recorded_at else ""
+        writer.writerow([course_code, student_name, date_str, r.status or "", r.source or ""])
+
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=attendance-register.csv"}
+    )

@@ -1,16 +1,22 @@
+import hashlib
+import secrets
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import SecurityService
 from app.models.department import Department
-from app.models.user import User, UserRole, UserStatus
+from app.models.invitation import Invitation
 from app.models.role import RoleTemplate
 from app.models.settings import DepartmentSettings
+from app.models.user import User, UserRole, UserStatus
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.department import DepartmentCreate, DepartmentUpdate
-from app.core.security import SecurityService
+from app.services.email_service import EmailService
 
 
 class DepartmentService:
@@ -18,6 +24,7 @@ class DepartmentService:
         self.db = db
         self.department_repo = DepartmentRepository(db)
         self.user_repo = UserRepository(db)
+        self.email_service = EmailService()
 
     async def create_department(
         self,
@@ -73,9 +80,9 @@ class DepartmentService:
         temp_password = None
         if generate_temp_password:
             temp_password = SecurityService.generate_temp_password()
-            hashed_password = SecurityService.hash_password(temp_password)
+            hashed_password = SecurityService.get_password_hash(temp_password)
         else:
-            hashed_password = SecurityService.hash_password("ChangeMe123!")  # Will be forced to change
+            hashed_password = SecurityService.get_password_hash("ChangeMe123!")  # Will be forced to change
         
         admin_user = User(
             email=data.email,
@@ -87,10 +94,30 @@ class DepartmentService:
             title="Department Administrator"
         )
         self.db.add(admin_user)
-        
+        await self.db.flush()
+
+        # Create invitation record and send email
+        raw_token = secrets.token_urlsafe(48)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        invitation = Invitation(
+            user_id=admin_user.id,
+            token_hash=token_hash,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        )
+        self.db.add(invitation)
+
         await self.db.commit()
         await self.db.refresh(department)
-        
+
+        await self.email_service.send_invitation_email(
+            to_email=data.email,
+            user_name=data.name,
+            role="department",
+            invitation_token=raw_token,
+            department_name=data.name,
+        )
+
         return department, temp_password
 
     async def get_department(self, department_id: uuid.UUID) -> Optional[dict]:
@@ -187,19 +214,47 @@ class DepartmentService:
         admin_result = await self.db.execute(
             select(User).where(
                 User.department_id == department_id,
-                User.role == UserRole.DEPARTMENT
+                User.role == UserRole.DEPARTMENT,
             )
         )
         admin = admin_result.scalar_one_or_none()
-        
+
         if not admin:
             return None
-        
-        # Reset status to invited and regenerate invitation
+
         admin.status = UserStatus.INVITED
+
+        # Expire any old invitations for this user
+        old_invitations = await self.db.execute(
+            select(Invitation).where(
+                Invitation.user_id == admin.id,
+                Invitation.accepted_at.is_(None),
+            )
+        )
+        for old_inv in old_invitations.scalars().all():
+            old_inv.expires_at = datetime.now(timezone.utc)
+
+        # Create fresh invitation
+        raw_token = secrets.token_urlsafe(48)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        invitation = Invitation(
+            user_id=admin.id,
+            token_hash=token_hash,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        )
+        self.db.add(invitation)
+
         await self.db.commit()
         await self.db.refresh(admin)
-        
-        # Email sending would happen here via notification service
-        
+
+        department = await self.department_repo.get_by_id(department_id)
+        await self.email_service.send_invitation_email(
+            to_email=admin.email,
+            user_name=admin.name,
+            role="department",
+            invitation_token=raw_token,
+            department_name=department.name if department else None,
+        )
+
         return admin

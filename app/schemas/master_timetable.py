@@ -16,6 +16,13 @@ class TimetablePreviewResponse(BaseModel):
     affected_requests: List[Dict[str, Any]]
 
 
+class DepartmentTimetablePreviewResponse(BaseModel):
+    preview_id: str
+    entries: List[Dict[str, Any]]
+    conflicts: List[Dict[str, Any]]
+    summary: Dict[str, Any]
+
+
 class TimetableListResponse(BaseModel):
     data: List[Dict[str, Any]]
 

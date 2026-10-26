@@ -13,8 +13,8 @@ class SemesterBase(BaseModel):
     end_date: datetime
     teaching_start: Optional[datetime] = None
     teaching_end: Optional[datetime] = None
-    registration_deadline: datetime
-    graduation_deadline: datetime
+    registration_deadline: Optional[datetime] = None
+    graduation_deadline: Optional[datetime] = None
     is_active: bool = False
 
 

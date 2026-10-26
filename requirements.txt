@@ -23,6 +23,7 @@ qrcode==7.4.2
 
 # Email / Messaging
 twilio==8.10.0
+aiohttp>=3.9.0
 
 # Config / Validation
 pydantic==2.5.0

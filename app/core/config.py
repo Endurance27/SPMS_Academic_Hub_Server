@@ -91,7 +91,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: Optional[str] = None
     ALLOWED_HOSTS: Optional[str] = None
 
-    # Email / third-party keys
+    # Mailtrap
+    MAILTRAP_API_KEY: Optional[str] = None
+    MAILTRAP_SENDER_EMAIL: str = "no-reply@example.com"
+    MAILTRAP_SENDER_NAME: str = "SPMS Academic Hub"
+
+    # Email / third-party keys (legacy)
     SENDGRID_API_KEY: Optional[str] = None
 
     class Config:

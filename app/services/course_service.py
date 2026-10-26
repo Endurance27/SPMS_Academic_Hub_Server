@@ -1,8 +1,8 @@
 import uuid
 from typing import List, Optional
 
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete, select
 
 from app.models.course import Course, course_cohorts
 from app.models.user import User, UserRole

@@ -121,3 +121,59 @@ async def get_final_timetable(
     service = ScheduleItemService(db)
     items, meta = await service.get_final_timetable(semester_id, level, current_user)
     return ScheduleItemListResponse(data=items, meta=meta)
+
+
+@router.get("/final/export")
+async def export_final_timetable(
+    semester_id: uuid.UUID = Query(...),
+    level: Optional[int] = Query(None),
+    current_user: User = Depends(require_permission("schedule.view")),
+    db: AsyncSession = Depends(get_db)
+):
+    """Export final timetable as CSV"""
+    import io
+    import csv
+    from fastapi.responses import StreamingResponse
+    from sqlalchemy.future import select
+    from sqlalchemy.orm import selectinload
+    from app.models.schedule_item import ScheduleItem, ScheduleItemStatus
+
+    query = (
+        select(ScheduleItem)
+        .options(selectinload(ScheduleItem.course), selectinload(ScheduleItem.lecturer))
+        .where(ScheduleItem.semester_id == semester_id)
+    )
+    if current_user.department_id:
+        query = query.where(ScheduleItem.department_id == current_user.department_id)
+    if level:
+        query = query.where(ScheduleItem.level == level)
+
+    query = query.order_by(ScheduleItem.day, ScheduleItem.start, ScheduleItem.venue_code)
+    result = await db.execute(query)
+    items = result.scalars().all()
+
+    WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    STATUS_LABELS = {"published": "Published", "pending": "Awaiting approval", "conflict": "Blocked by conflict"}
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Course", "Title", "Day", "Start", "End", "Venue", "Lecturer", "Mode", "Student group", "Status"])
+    for item in items:
+        course_code = item.course.code if item.course else ""
+        course_title = item.course.title if item.course else ""
+        day_name = WEEKDAYS[item.day] if item.day is not None and item.day < len(WEEKDAYS) else ""
+        lecturer_name = item.lecturer.name if item.lecturer else "Lecturer to be assigned"
+        status_label = STATUS_LABELS.get(item.status.value if isinstance(item.status, ScheduleItemStatus) else item.status, str(item.status))
+        groups = ", ".join(item.groups) if item.groups else ""
+        writer.writerow([course_code, course_title, day_name, item.start or "", item.end or "", item.venue_code or "", lecturer_name, item.mode or "", groups, status_label])
+
+    dept_code = current_user.department_id or "institution"
+    level_str = f"L{level}" if level else "all-levels"
+    filename = f"{dept_code}-{level_str}-final-timetable.csv"
+
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

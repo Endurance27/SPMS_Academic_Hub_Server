@@ -12,6 +12,10 @@ from app.core.database import Base
 class CourseType(str, enum.Enum):
     CORE = "Core"
     ELECTIVE = "Elective"
+    PROJECT = "Project / long essay/ thesis"
+    LAB = "Lab/practicals"
+    INTERNSHIP = "Internship"
+    SEMINAR = "Seminar"
 
 
 class CourseMode(str, enum.Enum):

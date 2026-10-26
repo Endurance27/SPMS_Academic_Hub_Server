@@ -1,11 +1,14 @@
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.deps import get_current_user, get_db
 from app.core.permissions import require_permission
+from app.models.registration import CourseRegistration, RegistrationStatus
 from app.models.user import User, UserRole
 from app.schemas.course import (
     CourseCreate,
@@ -114,7 +117,7 @@ async def create_course(
 @router.get("/{course_id}", response_model=CourseResponse)
 async def get_course(
     course_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("courses.view")),
     db: AsyncSession = Depends(get_db)
 ):
     """Get course by ID"""
@@ -177,3 +180,44 @@ async def delete_course(
         await service.delete_course(course_id, force)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.get("/{course_id}/students")
+async def get_course_students(
+    course_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    current_user: User = Depends(require_permission("courses.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get enrolled students for a course"""
+    await check_course_access(course_id, current_user, db)
+
+    skip = (page - 1) * page_size
+    query = (
+        select(CourseRegistration)
+        .options(selectinload(CourseRegistration.student).selectinload(User.programme))
+        .where(
+            CourseRegistration.course_id == course_id,
+            CourseRegistration.status == RegistrationStatus.REGISTERED,
+        )
+        .offset(skip)
+        .limit(page_size)
+    )
+    result = await db.execute(query)
+    registrations = list(result.scalars().all())
+
+    students = [
+        {
+            "id": r.student.id,
+            "name": r.student.name,
+            "email": r.student.email,
+            "student_number": r.student.student_number,
+            "programme": r.student.programme.name if r.student.programme else None,
+            "level": r.student.level,
+        }
+        for r in registrations
+        if r.student
+    ]
+
+    return {"data": students, "meta": {"page": page, "page_size": page_size}}

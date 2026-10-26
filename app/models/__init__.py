@@ -12,6 +12,7 @@ import app.models.course
 import app.models.semester
 import app.models.venue
 import app.models.master_timetable
+import app.models.timetable_upload
 import app.models.slot_request
 import app.models.schedule_item
 import app.models.assessment
@@ -20,3 +21,5 @@ import app.models.registration
 import app.models.graduation
 import app.models.settings
 import app.models.supporting
+import app.models.session
+import app.models.invitation

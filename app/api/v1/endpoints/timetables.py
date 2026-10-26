@@ -8,10 +8,11 @@ from app.core.deps import get_current_user, get_db
 from app.core.permissions import require_permission
 from app.models.user import User
 from app.schemas.master_timetable import (
+    DepartmentTimetablePreviewResponse,
     TimetablePreviewResponse,
     TimetablePublishRequest,
     TimetableListResponse,
-    TimetableEntriesResponse
+    TimetableEntriesResponse,
 )
 from app.services.master_timetable_service import MasterTimetableService
 
@@ -58,11 +59,16 @@ async def get_timetable_entries(
 async def preview_timetable(
     file: UploadFile = File(...),
     semester_id: uuid.UUID = Query(...),
-    level: int = Query(...),
+    level: Optional[int] = Query(None, description="Level to parse (100-400). Omit to parse all levels."),
     current_user: User = Depends(require_permission("timetable.upload")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Preview master timetable upload"""
+    """Preview master timetable upload.
+
+    For Excel files with multiple sheets (L100v1, L200v1, ...) omit
+    ``level`` to parse every sheet, or pass a specific level to parse
+    only that sheet.
+    """
     service = MasterTimetableService(db)
 
     if not file.filename or not file.filename.lower().endswith(('.xlsx', '.csv')):
@@ -78,7 +84,7 @@ async def preview_timetable(
         content=content,
         file_type=file_type,
         semester_id=semester_id,
-        level=level,
+        level=level or 0,
         filename=file.filename
     )
 
@@ -102,7 +108,7 @@ async def publish_timetable(
     return {"message": result}
 
 
-@router.post("/department/preview", response_model=TimetablePreviewResponse)
+@router.post("/department/preview", response_model=DepartmentTimetablePreviewResponse)
 async def preview_department_timetable(
     file: UploadFile = File(...),
     semester_id: uuid.UUID = Query(...),
@@ -204,3 +210,136 @@ async def get_upload_history(
     service = MasterTimetableService(db)
     history = await service.get_upload_history(semester_id)
     return {"data": history}
+
+
+@router.patch("/entries/{entry_id}")
+async def update_entry(
+    entry_id: uuid.UUID,
+    subject: Optional[str] = None,
+    venue_code: Optional[str] = None,
+    is_free: Optional[bool] = None,
+    current_user: User = Depends(require_permission("timetable.edit")),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update a master timetable entry"""
+    from sqlalchemy.future import select
+    from app.models.master_timetable import MasterEntry
+
+    result = await db.execute(select(MasterEntry).where(MasterEntry.id == entry_id))
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    if is_free:
+        entry.subject = "FREE"
+        entry.is_free = True
+    elif subject is not None:
+        entry.subject = subject.upper().strip()
+        entry.is_free = entry.subject == "FREE"
+    if venue_code is not None:
+        entry.venue_code = venue_code.upper().strip()
+
+    await db.commit()
+    await db.refresh(entry)
+    return {"data": {"id": str(entry.id), "subject": entry.subject, "venue_code": entry.venue_code, "is_free": entry.is_free}}
+
+
+@router.post("/entries", status_code=status.HTTP_201_CREATED)
+async def create_entry(
+    semester_id: uuid.UUID,
+    level: int,
+    day: int,
+    period: int,
+    subject: str,
+    venue_code: str,
+    current_user: User = Depends(require_permission("timetable.edit")),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new master timetable entry"""
+    from sqlalchemy.future import select
+    from app.models.master_timetable import MasterTimetable, MasterEntry
+
+    result = await db.execute(
+        select(MasterTimetable).where(
+            MasterTimetable.semester_id == semester_id,
+            MasterTimetable.level == level,
+        )
+    )
+    timetable = result.scalar_one_or_none()
+    if not timetable:
+        raise HTTPException(status_code=404, detail="Master timetable not found for this semester and level")
+
+    normalised_subject = subject.upper().strip()
+    entry = MasterEntry(
+        timetable_id=timetable.id,
+        level=level,
+        day=day,
+        period=period,
+        subject=normalised_subject,
+        venue_code=venue_code.upper().strip(),
+        is_free=normalised_subject == "FREE",
+    )
+    db.add(entry)
+    await db.commit()
+    await db.refresh(entry)
+    return {"data": {"id": str(entry.id), "subject": entry.subject, "venue_code": entry.venue_code}}
+
+
+@router.delete("/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_entry(
+    entry_id: uuid.UUID,
+    current_user: User = Depends(require_permission("timetable.edit")),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete a master timetable entry"""
+    from sqlalchemy.future import select
+    from app.models.master_timetable import MasterEntry
+
+    result = await db.execute(select(MasterEntry).where(MasterEntry.id == entry_id))
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    await db.delete(entry)
+    await db.commit()
+
+
+@router.get("/double-bookings")
+async def get_double_bookings(
+    semester_id: uuid.UUID = Query(...),
+    current_user: User = Depends(require_permission("timetable.view")),
+    db: AsyncSession = Depends(get_db)
+):
+    """Find cells with multiple subjects (excluding shared venues)"""
+    from sqlalchemy.future import select
+    from sqlalchemy import func
+    from app.models.master_timetable import MasterTimetable, MasterEntry
+
+    result = await db.execute(
+        select(MasterTimetable.id).where(MasterTimetable.semester_id == semester_id)
+    )
+    timetable_ids = [row[0] for row in result.all()]
+    if not timetable_ids:
+        return {"data": []}
+
+    result = await db.execute(
+        select(
+            MasterEntry.venue_code,
+            MasterEntry.day,
+            MasterEntry.period,
+            func.array_agg(func.distinct(MasterEntry.subject)),
+            func.count(func.distinct(MasterEntry.subject)),
+        )
+        .where(
+            MasterEntry.timetable_id.in_(timetable_ids),
+            MasterEntry.venue_code.notin_(["DEPT", "ONLINE"]),
+        )
+        .group_by(MasterEntry.venue_code, MasterEntry.day, MasterEntry.period)
+        .having(func.count(func.distinct(MasterEntry.subject)) > 1)
+    )
+
+    bookings = [
+        {"venue": row[0], "day": row[1], "period": row[2], "subjects": row[3]}
+        for row in result.all()
+    ]
+    return {"data": bookings}
