@@ -58,6 +58,9 @@ services:
       - "8899:8899"
     env_file:
       - .env
+    environment:
+      # Override DATABASE_URL to use local postgres
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-app_user}:${POSTGRES_PASSWORD:-app_pass}@postgres:5432/${POSTGRES_DB:-app_db}
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,6 +84,9 @@ services:
       - uploads_data:/app/uploads
     env_file:
       - .env
+    environment:
+      # Override DATABASE_URL to use local postgres
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-app_user}:${POSTGRES_PASSWORD:-app_pass}@postgres:5432/${POSTGRES_DB:-app_db}
     depends_on:
       - postgres
       - redis
@@ -94,6 +100,9 @@ services:
     command: celery -A app.tasks.celery_app beat --loglevel=info
     env_file:
       - .env
+    environment:
+      # Override DATABASE_URL to use local postgres
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-app_user}:${POSTGRES_PASSWORD:-app_pass}@postgres:5432/${POSTGRES_DB:-app_db}
     depends_on:
       - postgres
       - redis
