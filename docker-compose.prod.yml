@@ -52,7 +52,7 @@ services:
       - spms-network
 
   celery_worker:
-    image: ghcr.io/${GITHUB_USERNAME:-username}/${BUILD_IMAGE:-spms-academic-hub}:${BUILD_TAG:-latest}
+    image: ghcr.io/${GIT_USERNAME:-username}/${BUILD_IMAGE:-spms-academic-hub}:${BUILD_TAG:-latest}
     container_name: spms_celery_worker_prod
     command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
     volumes:
