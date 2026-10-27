@@ -41,7 +41,7 @@ async def mark_notifications_read(
 ):
     """Mark notifications as read"""
     notification_service = NotificationService(db)
-    await notification_service.mark_as_read(data.notification_ids)
+    await notification_service.mark_as_read(data.notification_ids, current_user.id)
 
 
 @router.post("/mark-all-read", status_code=status.HTTP_204_NO_CONTENT)
@@ -58,4 +58,4 @@ async def mark_all_read(
 
     if notifications:
         notification_ids = [n.id for n in notifications]
-        await notification_service.mark_as_read(notification_ids)
+        await notification_service.mark_as_read(notification_ids, current_user.id)

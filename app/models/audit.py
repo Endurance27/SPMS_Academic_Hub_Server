@@ -1,11 +1,24 @@
+import enum
 import uuid
-from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, String
+from sqlalchemy import JSON, Column, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+
+
+class AuditCategory(str, enum.Enum):
+    SCHEDULING = "Scheduling"
+    APPROVALS = "Approvals"
+    OVERRIDES = "Overrides"
+    ACADEMICS = "Academics"
+    PEOPLE = "People"
+    ASSESSMENTS = "Assessments"
+    ATTENDANCE = "Attendance"
+    GRADUATION = "Graduation"
+    SETTINGS = "Settings"
+    AUTH = "Auth"
 
 
 class AuditLog(Base):
@@ -15,19 +28,23 @@ class AuditLog(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False
     )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-
-    action = Column(String(100), nullable=False)  # e.g., "login", "create_application"
-    resource_type = Column(String(50))  # e.g., "application", "user"
-    resource_id = Column(UUID(as_uuid=True), nullable=True)
-
-    ip_address = Column(String(45))
+    actor_name = Column(String(255), nullable=False)
+    actor_role = Column(String(20), nullable=False)
+    action = Column(String(100), nullable=False)
+    category = Column(Enum(AuditCategory), nullable=False)
+    entity_type = Column(String(50))
+    entity_id = Column(UUID(as_uuid=True), nullable=True)
+    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"), nullable=True)
+    summary = Column(Text, nullable=False)
+    before = Column(JSON)
+    after = Column(JSON)
+    reason = Column(Text)
+    ip_address = Column(String(50))
     user_agent = Column(String(500))
+    revision = Column(Integer)
 
-    details = Column(JSON)  # Additional context
-    changes = Column(JSON)  # Before/after for updates
-
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Relationships
     user = relationship("User", back_populates="audit_logs", foreign_keys=[user_id])
+    department = relationship("Department")

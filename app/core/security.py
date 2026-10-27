@@ -1,3 +1,5 @@
+import secrets
+import string
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
@@ -23,6 +25,17 @@ class SecurityService:
         if len(password.encode("utf-8")) > 72:
             password = password[:72]
         return pwd_context.hash(password)
+
+    @staticmethod
+    def generate_temp_password(length: int = 16) -> str:
+        alphabet = string.ascii_letters + string.digits + "!@#$%"
+        while True:
+            pwd = "".join(secrets.choice(alphabet) for _ in range(length))
+            if (any(c.islower() for c in pwd)
+                    and any(c.isupper() for c in pwd)
+                    and any(c.isdigit() for c in pwd)
+                    and any(c in "!@#$%" for c in pwd)):
+                return pwd
 
     @staticmethod
     def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:

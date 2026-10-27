@@ -21,7 +21,7 @@ from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
 from app.core.security import SecurityService
 from app.models.role import Role
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, UserStatus
 
 # Email: admin@company.com
 #   Name: John Doe
@@ -146,12 +146,10 @@ async def create_admin_user():
             user = User(
                 email=email,
                 hashed_password=security.get_password_hash(password),
-                first_name=first_name,
-                last_name=last_name,
-                phone_number=phone_number,
-                role=UserRole.ADMINISTRATOR,
-                is_active=True,
-                is_verified=True,
+                name=f"{first_name} {last_name}",
+                phone=phone_number,
+                role=UserRole.SUPER,
+                status=UserStatus.ACTIVE,
                 two_factor_enabled=True,
                 two_factor_method="totp",
                 two_factor_secret=totp_secret,
@@ -185,7 +183,7 @@ async def create_admin_user():
             print("=" * 60)
             print(f"User ID: {user.id}")
             print(f"Email: {user.email}")
-            print(f"Name: {user.first_name} {user.last_name}")
+            print(f"Name: {user.name}")
             print(f"Role: {user.role}")
             if super_admin_role:
                 print(f"Custom Roles: Super Administrator")

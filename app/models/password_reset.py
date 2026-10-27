@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -24,7 +24,7 @@ class PasswordResetToken(Base):
 
     expires_at = Column(DateTime, nullable=False)
     used_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=func.now())
 
     # Relationships
     user = relationship("User")

@@ -72,9 +72,9 @@ class PasswordService:
         await self.db.commit()
 
         # Send email with code
-        self.email_service.send_password_reset_code_email(
+        await self.email_service.send_password_reset_code_email(
             to_email=user.email,
-            user_name=f"{user.first_name} {user.last_name}",
+            user_name=user.name,
             reset_code=code,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -152,9 +152,9 @@ class PasswordService:
         await self.db.refresh(user)
 
         # Send confirmation email
-        self.email_service.send_password_changed_notification_email(
+        await self.email_service.send_password_changed_notification_email(
             to_email=user.email,
-            user_name=f"{user.first_name} {user.last_name}",
+            user_name=user.name,
             ip_address=ip_address,
             user_agent=user_agent,
             change_type="reset",
@@ -192,9 +192,9 @@ class PasswordService:
         await self.db.refresh(user)
 
         # Send confirmation email
-        self.email_service.send_password_changed_notification_email(
+        await self.email_service.send_password_changed_notification_email(
             to_email=user.email,
-            user_name=f"{user.first_name} {user.last_name}",
+            user_name=user.name,
             ip_address=ip_address,
             user_agent=user_agent,
             change_type="change",

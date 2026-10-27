@@ -1,23 +1,20 @@
 import enum
 import uuid
-from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, ForeignKey, String, Text
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
 
-class NotificationType(str, enum.Enum):
-    APPLICATION_SUBMITTED = "application_submitted"
-    TASK_ASSIGNED = "task_assigned"
-    TASK_COMPLETED = "task_completed"
-    REPORT_GENERATED = "report_generated"
-    INVITATION_SENT = "invitation_sent"
-    COMMENT_ADDED = "comment_added"
-    STATUS_CHANGED = "status_changed"
-    SYSTEM_ALERT = "system_alert"
+class NotificationCategory(str, enum.Enum):
+    SCHEDULE = "schedule"
+    ASSESSMENT = "assessment"
+    ATTENDANCE = "attendance"
+    GRADUATION = "graduation"
+    GENERAL = "general"
 
 
 class NotificationPriority(str, enum.Enum):
@@ -33,39 +30,28 @@ class Notification(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False
     )
 
-    # Recipient
-    user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    # Recipient (optional - for direct messages)
+    recipient_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
 
     # Notification details
-    type = Column(Enum(NotificationType), nullable=False)
+    title = Column(String(255), nullable=False)
+    detail = Column(Text, nullable=False)
+    page = Column(String(100))  # Portal page label
+    category = Column(Enum(NotificationCategory), nullable=False)
     priority = Column(Enum(NotificationPriority), default=NotificationPriority.MEDIUM)
 
-    title = Column(String(255), nullable=False)
-    message = Column(Text, nullable=False)
+    # Audience targeting (for broadcasts)
+    audience_role = Column(String(20))  # Role enum value
+    audience_department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"))
 
     # Related resources
-    resource_type = Column(String(50))  # e.g., "application", "task"
-    resource_id = Column(UUID(as_uuid=True))
-
-    # Action URL
-    action_url = Column(String(500))
-
-    # Metadata
-    data = Column(JSON)  # Additional notification data
-
-    # Status
-    is_read = Column(Boolean, default=False, index=True)
-    read_at = Column(DateTime, nullable=True)
-
-    # Delivery channels
-    sent_email = Column(Boolean, default=False)
-    sent_sms = Column(Boolean, default=False)
-    sent_push = Column(Boolean, default=False)
+    entity_type = Column(String(50))
+    entity_id = Column(UUID(as_uuid=True))
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), index=True)
 
     # Relationships
-    user = relationship("User")
+    recipient = relationship("User", foreign_keys=[recipient_id])
+    audience_department = relationship("Department")
+    reads = relationship("NotificationRead", back_populates="notification", cascade="all, delete-orphan")

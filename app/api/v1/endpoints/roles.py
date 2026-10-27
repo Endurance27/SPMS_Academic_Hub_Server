@@ -16,7 +16,7 @@ router = APIRouter(prefix="/roles", tags=["Roles & Permissions"])
 @router.post("", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
 async def create_role(
     data: RoleCreate,
-    current_user: User = Depends(require_permission("role.create")),
+    current_user: User = Depends(require_permission("roles.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Create new role (Admin only)"""
@@ -27,7 +27,7 @@ async def create_role(
 
 @router.get("", response_model=List[RoleResponse])
 async def list_roles(
-    current_user: User = Depends(require_permission("role.view")),
+    current_user: User = Depends(require_permission("roles.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """List all roles"""
@@ -39,7 +39,7 @@ async def list_roles(
 @router.get("/{role_id}", response_model=RoleResponse)
 async def get_role(
     role_id: uuid.UUID,
-    current_user: User = Depends(require_permission("role.view")),
+    current_user: User = Depends(require_permission("roles.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Get role details"""
@@ -56,7 +56,7 @@ async def get_role(
 async def update_role(
     role_id: uuid.UUID,
     data: RoleUpdate,
-    current_user: User = Depends(require_permission("role.update")),
+    current_user: User = Depends(require_permission("roles.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Update role"""
@@ -68,7 +68,7 @@ async def update_role(
 @router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_role(
     role_id: uuid.UUID,
-    current_user: User = Depends(require_permission("role.delete")),
+    current_user: User = Depends(require_permission("roles.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete role"""
@@ -79,7 +79,7 @@ async def delete_role(
 
 @router.get("/permissions/all", response_model=List[PermissionResponse])
 async def list_permissions(
-    current_user: User = Depends(require_permission("role.view")),
+    current_user: User = Depends(require_permission("roles.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """List all available permissions"""

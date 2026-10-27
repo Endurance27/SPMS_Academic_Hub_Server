@@ -16,7 +16,7 @@ class PermissionChecker:
     async def has_permission(user: User, permission_code: str) -> bool:
         """Check if user has specific permission"""
         # Super admin has all permissions
-        if user.role == UserRole.ADMINISTRATOR and not user.roles:
+        if user.role == UserRole.SUPER:
             return True
 
         # Check user's roles
@@ -67,11 +67,11 @@ def require_permission(permission_code: str):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # ✅ Administrator bypass
-        if user.role == UserRole.ADMINISTRATOR:
+        # Super admin bypass
+        if user.role == UserRole.SUPER:
             return user
 
-        # ✅ Check if user has the given permission
+        # Check if user has the given permission
         has_perm = False
         for role in user.roles:
             for perm in role.permissions:
