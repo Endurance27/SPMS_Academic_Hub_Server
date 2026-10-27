@@ -250,12 +250,12 @@ jobs:
                 echo "Health check passed on attempt $i"
                 exit 0
               fi
-              echo "Waiting for API to become healthy ($i/36)..."
+              echo "Waiting for API to become healthy ($i/10)..."
               sleep 10
             done
 
             # Health check failed - show logs and exit
-            echo "Health check failed after 36 attempts"
+            echo "Health check failed after 10 attempts"
             docker compose -f docker-compose.prod.yml ps
             docker compose -f docker-compose.prod.yml logs --tail=100 api
             exit 1
