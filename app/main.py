@@ -66,7 +66,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="SPMS Academic Hub",
     version=settings.API_VERSION,
-    docs_url="/docs",
+    docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
@@ -92,7 +92,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 if settings.DOCS_USERNAME and settings.DOCS_PASSWORD:
     @app.middleware("http")
     async def docs_auth_middleware(request: Request, call_next):
-        if request.url.path in ["/docs", "/redoc", "/api/docs", "/api/redoc", "/api/openapi.json"]:
+        if request.url.path in ["/api/docs", "/api/redoc", "/api/openapi.json"]:
             auth = request.headers.get("authorization")
             if not auth or not auth.startswith("Basic "):
                 return Response(
