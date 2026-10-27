@@ -1,4 +1,24 @@
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: spms_postgres_prod
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-app_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app_user} -d ${POSTGRES_DB:-app_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - spms-network
+
   redis:
     image: redis:7-alpine
     container_name: spms_redis_prod
@@ -17,7 +37,7 @@ services:
       - spms-network
 
   api:
-    image: ghcr.io/${GITHUB_USERNAME:-username}/${BUILD_IMAGE:-spms-academic-hub}:${BUILD_TAG:-latest}
+    image: ghcr.io/${GITHUB_USERNAME}/${BUILD_IMAGE}:${BUILD_TAG}
     container_name: spms_api_prod
     command: ["bash", "scripts/startup.sh", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8899", "--workers", "2"]
     volumes:
@@ -27,6 +47,8 @@ services:
     env_file:
       - .env
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -40,7 +62,7 @@ services:
       - spms-network
 
   celery_worker:
-    image: ghcr.io/${GITHUB_USERNAME:-username}/${BUILD_IMAGE:-spms-academic-hub}:${BUILD_TAG:-latest}
+    image: ghcr.io/${GITHUB_USERNAME}/${BUILD_IMAGE}:${BUILD_TAG}
     container_name: spms_celery_worker_prod
     command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
     volumes:
@@ -48,24 +70,27 @@ services:
     env_file:
       - .env
     depends_on:
+      - postgres
       - redis
     restart: unless-stopped
     networks:
       - spms-network
 
   celery_beat:
-    image: ghcr.io/${GITHUB_USERNAME:-username}/${BUILD_IMAGE:-spms-academic-hub}:${BUILD_TAG:-latest}
+    image: ghcr.io/${GITHUB_USERNAME}/${BUILD_IMAGE}:${BUILD_TAG}
     container_name: spms_celery_beat_prod
     command: celery -A app.tasks.celery_app beat --loglevel=info
     env_file:
       - .env
     depends_on:
+      - postgres
       - redis
     restart: unless-stopped
     networks:
       - spms-network
 
 volumes:
+  postgres_data:
   redis_data:
   uploads_data:
 
