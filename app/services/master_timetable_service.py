@@ -188,10 +188,15 @@ class MasterTimetableService:
         parse_result = parser.parse_file(content, file_type, 0, str(semester_id))
 
         # Filter entries by department subject prefixes
+        # Fall back to department code when no subject prefixes are configured
+        prefixes = department.subject_prefixes or []
+        if not prefixes:
+            prefixes = [department.code.upper()]
+
         filtered_entries = []
         for entry in parse_result["entries"]:
             subject = entry.get("subject", "")
-            if any(subject.startswith(prefix) for prefix in department.subject_prefixes):
+            if any(subject.startswith(prefix) for prefix in prefixes):
                 filtered_entries.append(entry)
 
         # Check for conflicts with master timetable

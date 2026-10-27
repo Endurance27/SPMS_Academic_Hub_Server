@@ -1,0 +1,262 @@
+name: Release and Deploy
+
+on:
+  push:
+    branches:
+      - staging
+      - amos-dev
+  pull_request:
+    branches:
+      - staging
+      - amos-dev
+  workflow_dispatch:
+    inputs:
+      version:
+        default: latest
+        description: Tag you want to release
+
+env:
+  GITHUB_USERNAME: "your-github-username"
+  BUILD_IMAGE: ${{ vars.BUILD_IMAGE || 'spms-academic-hub' }}
+  BUILD_TAG: ${{ github.event.inputs.version || 'latest' }}
+
+jobs:
+  quality:
+    name: Quality (Lint & Test)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: app_user
+          POSTGRES_PASSWORD: app_pass
+          POSTGRES_DB: app_db
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://app_user:app_pass@localhost:5433/app_db
+      TEST_DATABASE_URL: postgresql+asyncpg://app_user:app_pass@localhost:5433/app_db
+      SECRET_KEY: ci-secret-key
+      JWT_SECRET_KEY: ci-jwt-secret
+      REDIS_PASSWORD: redis_pass
+      REDIS_URL: redis://:redis_pass@localhost:6379/0
+      CELERY_BROKER_URL: redis://:redis_pass@localhost:6379/0
+      CELERY_RESULT_BACKEND: redis://:redis_pass@localhost:6379/0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+
+      - name: Syntax check
+        run: python -m compileall -q app
+
+      - name: Run tests with coverage
+        run: pytest tests -v --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=59
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  build-and-push:
+    name: Build and Push Docker Images
+    needs: quality
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/staging')
+    runs-on: ubuntu-latest
+
+    env:
+      GIT_PERSONAL_ACCESS_TOKEN: ${{ secrets.GIT_PERSONAL_ACCESS_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: make build-image
+
+      - name: Push image
+        run: make build-image-push
+
+  deploy:
+    name: Deploy to Production Server
+    needs: build-and-push
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/staging')
+    runs-on: ubuntu-latest
+
+    env:
+      # App Configuration
+      APP_ENV: production
+      DEBUG: false
+      LOG_LEVEL: INFO
+
+      # Secrets
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+      JWT_ALGORITHM: HS256
+
+      # Database
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # Redis
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+
+      # Celery
+      CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+      CELERY_RESULT_BACKEND: ${{ secrets.CELERY_RESULT_BACKEND }}
+
+      # Email
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
+      # Mailtrap
+      MAILTRAP_API_KEY: ${{ secrets.MAILTRAP_API_KEY }}
+      MAILTRAP_SENDER_EMAIL: ${{ secrets.MAILTRAP_SENDER_EMAIL }}
+      MAILTRAP_SENDER_NAME: ${{ secrets.MAILTRAP_SENDER_NAME }}
+
+      # 2FA
+      TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+      TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+      TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
+
+      # External APIs
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+      # Security
+      BCRYPT_ROUNDS: 12
+      SESSION_TIMEOUT_MINUTES: 60
+      MAX_LOGIN_ATTEMPTS: 5
+      LOCKOUT_DURATION_MINUTES: 30
+
+      # CORS
+      CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+      ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
+
+      # Frontend
+      FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+
+      # GitHub Container Registry
+      GITHUB_USERNAME: ${{ secrets.GITHUB_USERNAME }}
+      GIT_PERSONAL_ACCESS_TOKEN: ${{ secrets.GIT_PERSONAL_ACCESS_TOKEN }}
+      BUILD_IMAGE: ${{ vars.BUILD_IMAGE || 'spms-academic-hub' }}
+      BUILD_TAG: ${{ github.event.inputs.version || 'latest' }}
+
+      # Deployment
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USERNAME: ${{ secrets.DEPLOY_USERNAME }}
+      DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create production .env file
+        run: |
+          python3 - <<'PY'
+          import os
+          keys = [
+              "APP_ENV", "DEBUG", "LOG_LEVEL",
+              "SECRET_KEY", "JWT_SECRET_KEY", "JWT_ALGORITHM",
+              "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
+              "POSTGRES_HOST", "POSTGRES_PORT", "DATABASE_URL",
+              "REDIS_PASSWORD", "REDIS_URL",
+              "CELERY_BROKER_URL", "CELERY_RESULT_BACKEND",
+              "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM",
+              "MAILTRAP_API_KEY", "MAILTRAP_SENDER_EMAIL", "MAILTRAP_SENDER_NAME",
+              "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER",
+              "GOOGLE_MAPS_API_KEY",
+              "BCRYPT_ROUNDS", "SESSION_TIMEOUT_MINUTES",
+              "MAX_LOGIN_ATTEMPTS", "LOCKOUT_DURATION_MINUTES",
+              "CORS_ORIGINS", "ALLOWED_HOSTS",
+              "FRONTEND_URL",
+              "GITHUB_USERNAME", "GIT_PERSONAL_ACCESS_TOKEN",
+              "BUILD_IMAGE", "BUILD_TAG",
+          ]
+          with open(".env", "w") as handle:
+              for key in keys:
+                  value = os.environ.get(key, "")
+                  if value.strip() == "":
+                      continue
+                  handle.write(f"{key}={value}\n")
+          PY
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USERNAME }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          port: 22
+          source: "docker-compose.prod.yml,Makefile,.env"
+          target: "/home/sbuild/spms-academic-hub"
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v0.1.4
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USERNAME }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          script: |
+            cd /home/sbuild/spms-academic-hub
+
+            # Extract credentials from .env
+            export GITHUB_USERNAME="$(grep -E '^GITHUB_USERNAME=' .env | cut -d= -f2-)"
+            export GIT_PERSONAL_ACCESS_TOKEN="$(grep -E '^GIT_PERSONAL_ACCESS_TOKEN=' .env | cut -d= -f2-)"
+            export BUILD_IMAGE="$(grep -E '^BUILD_IMAGE=' .env | cut -d= -f2-)"
+            export BUILD_TAG="$(grep -E '^BUILD_TAG=' .env | cut -d= -f2-)"
+
+            # Pull Docker image
+            make build-image-pull
+
+            # Start containers
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans --pull always
+
+            # Wait for containers to start
+            sleep 10
+
+            # Check container status
+            docker compose -f docker-compose.prod.yml ps
+
+            # Check API logs
+            docker compose -f docker-compose.prod.yml logs --tail=50 api
+
+            # Health check (retry up to 36 times, 10s each = 6 minutes)
+            for i in $(seq 1 36); do
+              if curl -fsS http://localhost:8899/health >/dev/null 2>&1; then
+                echo "Health check passed on attempt $i"
+                exit 0
+              fi
+              echo "Waiting for API to become healthy ($i/36)..."
+              sleep 10
+            done
+
+            # Health check failed - show logs and exit
+            echo "Health check failed after 36 attempts"
+            docker compose -f docker-compose.prod.yml ps
+            docker compose -f docker-compose.prod.yml logs --tail=100 api
+            exit 1

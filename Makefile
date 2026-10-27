@@ -235,6 +235,45 @@ prod-deploy: prod-build prod-down prod-up migrate seed-permissions ## Full produ
 	@echo "${GREEN}Production deployment complete!${RESET}"
 
 # ============================================================================
+# Docker Image Build & Push (CI/CD)
+# ============================================================================
+BUILD_IMAGE ?= spms-academic-hub
+BUILD_TAG ?= latest
+GITHUB_USERNAME ?= username
+
+build-image: ## Build Docker image
+	docker build -f docker/Dockerfile -t "$(BUILD_IMAGE):$(BUILD_TAG)" .
+	@echo "${GREEN}Docker image built: $(BUILD_IMAGE):$(BUILD_TAG)${RESET}"
+
+build-image-push: ## Build and push Docker image to GHCR
+	@echo "${YELLOW}Logging into GitHub Container Registry...${RESET}"
+	@echo "$(GIT_PERSONAL_ACCESS_TOKEN)" | docker login ghcr.io -u "$(GITHUB_USERNAME)" --password-stdin
+	@echo "${YELLOW}Tagging image for GHCR...${RESET}"
+	docker tag "$(BUILD_IMAGE):$(BUILD_TAG)" "ghcr.io/$(GITHUB_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
+	@echo "${YELLOW}Pushing image to GHCR...${RESET}"
+	docker push "ghcr.io/$(GITHUB_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
+	@echo "${GREEN}Image pushed to GHCR: ghcr.io/$(GITHUB_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)${RESET}"
+
+build-image-pull: ## Pull Docker image from GHCR
+	@echo "${YELLOW}Logging into GitHub Container Registry...${RESET}"
+	@echo "$(GIT_PERSONAL_ACCESS_TOKEN)" | docker login ghcr.io -u "$(GITHUB_USERNAME)" --password-stdin
+	@echo "${YELLOW}Pulling image from GHCR...${RESET}"
+	docker pull "ghcr.io/$(GITHUB_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
+	@echo "${GREEN}Image pulled from GHCR${RESET}"
+
+prod-migrate: ## Run migrations in production
+	docker compose -f docker-compose.prod.yml exec -T api python scripts/migrate_db.py
+	@echo "${GREEN}Production migrations applied!${RESET}"
+
+prod-seed-permissions: ## Seed permissions in production
+	docker compose -f docker-compose.prod.yml exec -T api python scripts/seed_permissions.py
+	@echo "${GREEN}Production permissions seeded!${RESET}"
+
+prod-nuke: ## Clean production (removes volumes, images, containers)
+	docker compose -f docker-compose.prod.yml down --rmi all --volumes --remove-orphans
+	@echo "${YELLOW}Production Docker resources cleaned${RESET}"
+
+# ============================================================================
 # Monitoring
 # ============================================================================
 health: ## Check health of all services
