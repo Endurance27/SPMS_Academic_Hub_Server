@@ -17,9 +17,21 @@ services:
       - spms-network
 
   api:
-    image: ghcr.io/${GITHUB_USERNAME:-username}/${BUILD_IMAGE:-spms-academic-hub}:${BUILD_TAG:-latest}
+    image: ghcr.io/${GIT_USERNAME:-username}/${BUILD_IMAGE:-spms-academic-hub}:${BUILD_TAG:-latest}
     container_name: spms_api_prod
-    command: ["bash", "scripts/startup.sh", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8899", "--workers", "2"]
+    command:
+      [
+        "bash",
+        "scripts/startup.sh",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8899",
+        "--workers",
+        "2",
+      ]
     volumes:
       - uploads_data:/app/uploads
     ports:
@@ -54,7 +66,7 @@ services:
       - spms-network
 
   celery_beat:
-    image: ghcr.io/${GITHUB_USERNAME:-username}/${BUILD_IMAGE:-spms-academic-hub}:${BUILD_TAG:-latest}
+    image: ghcr.io/${GIT_USERNAME:-username}/${BUILD_IMAGE:-spms-academic-hub}:${BUILD_TAG:-latest}
     container_name: spms_celery_beat_prod
     command: celery -A app.tasks.celery_app beat --loglevel=info
     env_file:
