@@ -228,6 +228,22 @@ jobs:
             export GIT_PERSONAL_ACCESS_TOKEN="$(grep -E '^GIT_PERSONAL_ACCESS_TOKEN=' .env | cut -d= -f2-)"
             export BUILD_IMAGE="$(grep -E '^BUILD_IMAGE=' .env | cut -d= -f2-)"
             export BUILD_TAG="$(grep -E '^BUILD_TAG=' .env | cut -d= -f2-)"
+            export DATABASE_URL="$(grep -E '^DATABASE_URL=' .env | cut -d= -f2-)"
+
+            echo "Testing database connection..."
+            # Extract host and port from DATABASE_URL for testing
+            DB_HOST=$(echo $DATABASE_URL | sed -n 's/.*@\([^:]*\):.*/\1/p')
+            DB_PORT=$(echo $DATABASE_URL | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+            echo "DB Host: $DB_HOST, DB Port: $DB_PORT"
+            
+            # Test if DB is reachable
+            if nc -zv $DB_HOST $DB_PORT 2>&1 | grep -q succeeded; then
+              echo "✓ Database is reachable"
+            else
+              echo "✗ Database is NOT reachable from production server"
+              echo "Please check firewall rules and ensure the production server can access $DB_HOST:$DB_PORT"
+              exit 1
+            fi
 
             # Pull Docker image
             make build-image-pull
