@@ -4,7 +4,9 @@
 GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
 RESET  := $(shell tput -Txterm sgr0)
-	
+
+GIT_USERNAME = legend-crypt
+BUILD_IMAGE = spms-academic-hub
 
 help:
 	@echo "Available commands:"
@@ -239,7 +241,7 @@ prod-deploy: prod-build prod-down prod-up migrate seed-permissions ## Full produ
 # ============================================================================
 BUILD_IMAGE ?= spms-academic-hub
 BUILD_TAG ?= latest
-GITHUB_USERNAME ?= username
+GIT_USERNAME ?= username
 
 build-image: ## Build Docker image
 	docker build -f docker/Dockerfile -t "$(BUILD_IMAGE):$(BUILD_TAG)" .
@@ -247,18 +249,18 @@ build-image: ## Build Docker image
 
 build-image-push: ## Build and push Docker image to GHCR
 	@echo "${YELLOW}Logging into GitHub Container Registry...${RESET}"
-	@echo "$(GIT_PERSONAL_ACCESS_TOKEN)" | docker login ghcr.io -u "$(GITHUB_USERNAME)" --password-stdin
+	@echo "$(GIT_PERSONAL_ACCESS_TOKEN)" | docker login ghcr.io -u "$(GIT_USERNAME)" --password-stdin
 	@echo "${YELLOW}Tagging image for GHCR...${RESET}"
-	docker tag "$(BUILD_IMAGE):$(BUILD_TAG)" "ghcr.io/$(GITHUB_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
+	docker tag "$(BUILD_IMAGE):$(BUILD_TAG)" "ghcr.io/$(GIT_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
 	@echo "${YELLOW}Pushing image to GHCR...${RESET}"
-	docker push "ghcr.io/$(GITHUB_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
-	@echo "${GREEN}Image pushed to GHCR: ghcr.io/$(GITHUB_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)${RESET}"
+	docker push "ghcr.io/$(GIT_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
+	@echo "${GREEN}Image pushed to GHCR: ghcr.io/$(GIT_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)${RESET}"
 
 build-image-pull: ## Pull Docker image from GHCR
 	@echo "${YELLOW}Logging into GitHub Container Registry...${RESET}"
-	@echo "$(GIT_PERSONAL_ACCESS_TOKEN)" | docker login ghcr.io -u "$(GITHUB_USERNAME)" --password-stdin
+	@echo "$(GIT_PERSONAL_ACCESS_TOKEN)" | docker login ghcr.io -u "$(GIT_USERNAME)" --password-stdin
 	@echo "${YELLOW}Pulling image from GHCR...${RESET}"
-	docker pull "ghcr.io/$(GITHUB_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
+	docker pull "ghcr.io/$(GIT_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
 	@echo "${GREEN}Image pulled from GHCR${RESET}"
 
 prod-migrate: ## Run migrations in production

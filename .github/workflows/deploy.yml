@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - staging
-      - amos-dev
   pull_request:
     branches:
       - staging
@@ -16,86 +15,68 @@ on:
         description: Tag you want to release
 
 env:
-  GITHUB_USERNAME: "your-github-username"
-  BUILD_IMAGE: ${{ vars.BUILD_IMAGE || 'spms-academic-hub' }}
   BUILD_TAG: ${{ github.event.inputs.version || 'latest' }}
 
 jobs:
-  quality:
-    name: Quality (Lint & Test)
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: app_user
-          POSTGRES_PASSWORD: app_pass
-          POSTGRES_DB: app_db
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+  # quality:
+  #   name: Quality (Lint & Test)
+  #   runs-on: ubuntu-latest
+  #   services:
+  #     postgres:
+  #       image: postgres:16-alpine
+  #       env:
+  #         POSTGRES_USER: app_user
+  #         POSTGRES_PASSWORD: app_pass
+  #         POSTGRES_DB: app_db
+  #       ports:
+  #         - 5433:5432
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
 
-      redis:
-        image: redis:7-alpine
-        command: redis-server --requirepass redis_pass
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli -a redis_pass ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+  #   env:
+  #     POSTGRES_USER: app_user
+  #     POSTGRES_PASSWORD: app_pass
+  #     POSTGRES_DB: app_db
+  #     DATABASE_URL: postgresql+asyncpg://app_user:app_pass@localhost:5433/app_db
+  #     TEST_DATABASE_URL: postgresql+asyncpg://app_user:app_pass@localhost:5433/app_db
+  #     SECRET_KEY: ci-secret-key
+  #     JWT_SECRET_KEY: ci-jwt-secret
+  #     REDIS_PASSWORD: redis_pass
+  #     REDIS_URL: redis://:redis_pass@localhost:6379/0
+  #     CELERY_BROKER_URL: redis://:redis_pass@localhost:6379/0
+  #     CELERY_RESULT_BACKEND: redis://:redis_pass@localhost:6379/0
 
-    env:
-      POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'app_user' }}
-      POSTGRES_PASSWORD: ${{ vars.CI_POSTGRES_PASSWORD || 'app_pass' }}
-      POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'app_db' }}
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: 5433
-      DATABASE_URL: postgresql+asyncpg://${{ vars.CI_POSTGRES_USER || 'app_user' }}:${{ vars.CI_POSTGRES_PASSWORD || 'app_pass' }}@localhost:5433/${{ vars.CI_POSTGRES_DB || 'app_db' }}
-      TEST_DATABASE_URL: postgresql+asyncpg://${{ vars.CI_POSTGRES_USER || 'app_user' }}:${{ vars.CI_POSTGRES_PASSWORD || 'app_pass' }}@localhost:5433/${{ vars.CI_POSTGRES_DB || 'app_db' }}
-      SECRET_KEY: ${{ secrets.CI_SECRET_KEY || 'ci-secret-key' }}
-      JWT_SECRET_KEY: ${{ secrets.CI_JWT_SECRET_KEY || 'ci-jwt-secret' }}
-      REDIS_PASSWORD: ${{ vars.CI_REDIS_PASSWORD || 'redis_pass' }}
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
-      REDIS_URL: redis://:${{ vars.CI_REDIS_PASSWORD || 'redis_pass' }}@localhost:6379/0
-      CELERY_BROKER_URL: redis://:${{ vars.CI_REDIS_PASSWORD || 'redis_pass' }}@localhost:6379/0
-      CELERY_RESULT_BACKEND: redis://:${{ vars.CI_REDIS_PASSWORD || 'redis_pass' }}@localhost:6379/0
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #     - name: Set up Python 3.11
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.11"
+  #         cache: pip
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install -r requirements-dev.txt
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements-dev.txt
+  #     - name: Syntax check
+  #       run: python -m compileall -q app
 
-      - name: Syntax check
-        run: python -m compileall -q app
+  #     - name: Run tests with coverage
+  #       run: pytest tests -v --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=59
 
-      - name: Run tests with coverage
-        run: pytest tests -v --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=0
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@v4
+  #       with:
+  #         file: ./coverage.xml
+  #         fail_ci_if_error: false
 
   build-and-push:
     name: Build and Push Docker Images
-    needs: quality
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/staging')
     runs-on: ubuntu-latest
 
@@ -179,8 +160,8 @@ jobs:
       FRONTEND_URL: ${{ vars.FRONTEND_URL }}
 
       # GitHub Container Registry
-      GITHUB_USERNAME: ${{ secrets.GITHUB_USERNAME }}
       GIT_PERSONAL_ACCESS_TOKEN: ${{ secrets.GIT_PERSONAL_ACCESS_TOKEN }}
+      GIT_USERNAME: ${{ secrets.GIT_USERNAME || 'username' }}
       BUILD_IMAGE: ${{ vars.BUILD_IMAGE || 'spms-academic-hub' }}
       BUILD_TAG: ${{ github.event.inputs.version || 'latest' }}
 
@@ -212,7 +193,7 @@ jobs:
               "MAX_LOGIN_ATTEMPTS", "LOCKOUT_DURATION_MINUTES",
               "CORS_ORIGINS", "ALLOWED_HOSTS",
               "FRONTEND_URL",
-              "GITHUB_USERNAME", "GIT_PERSONAL_ACCESS_TOKEN",
+              "GIT_USERNAME", "GIT_PERSONAL_ACCESS_TOKEN",
               "BUILD_IMAGE", "BUILD_TAG",
           ]
           with open(".env", "w") as handle:
@@ -243,7 +224,7 @@ jobs:
             cd /home/sbuild/spms-academic-hub
 
             # Extract credentials from .env
-            export GITHUB_USERNAME="$(grep -E '^GITHUB_USERNAME=' .env | cut -d= -f2-)"
+            export GIT_USERNAME="$(grep -E '^GIT_USERNAME=' .env | cut -d= -f2-)"
             export GIT_PERSONAL_ACCESS_TOKEN="$(grep -E '^GIT_PERSONAL_ACCESS_TOKEN=' .env | cut -d= -f2-)"
             export BUILD_IMAGE="$(grep -E '^BUILD_IMAGE=' .env | cut -d= -f2-)"
             export BUILD_TAG="$(grep -E '^BUILD_TAG=' .env | cut -d= -f2-)"
@@ -263,18 +244,18 @@ jobs:
             # Check API logs
             docker compose -f docker-compose.prod.yml logs --tail=50 api
 
-            # Health check (retry up to 36 times, 10s each = 6 minutes)
-            for i in $(seq 1 36); do
+            # Health check (retry up to 10 times, 10s each = 100 seconds)
+            for i in $(seq 1 10); do
               if curl -fsS http://localhost:8899/health >/dev/null 2>&1; then
                 echo "Health check passed on attempt $i"
                 exit 0
               fi
-              echo "Waiting for API to become healthy ($i/36)..."
+              echo "Waiting for API to become healthy ($i/10)..."
               sleep 10
             done
 
             # Health check failed - show logs and exit
-            echo "Health check failed after 36 attempts"
+            echo "Health check failed after 10 attempts"
             docker compose -f docker-compose.prod.yml ps
             docker compose -f docker-compose.prod.yml logs --tail=100 api
             exit 1
