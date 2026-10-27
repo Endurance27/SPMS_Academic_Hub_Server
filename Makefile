@@ -4,7 +4,9 @@
 GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
 RESET  := $(shell tput -Txterm sgr0)
-	
+
+GITHUB_USERNAME = legend-crypt
+BUILD_IMAGE = spms-academic-hub
 
 help:
 	@echo "Available commands:"
