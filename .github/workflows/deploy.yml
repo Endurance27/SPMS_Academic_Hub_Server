@@ -161,6 +161,7 @@ jobs:
 
       # GitHub Container Registry
       GIT_PERSONAL_ACCESS_TOKEN: ${{ secrets.GIT_PERSONAL_ACCESS_TOKEN }}
+      GIT_USERNAME: ${{ secrets.GIT_USERNAME || 'username' }}
       BUILD_IMAGE: ${{ vars.BUILD_IMAGE || 'spms-academic-hub' }}
       BUILD_TAG: ${{ github.event.inputs.version || 'latest' }}
 
@@ -192,7 +193,7 @@ jobs:
               "MAX_LOGIN_ATTEMPTS", "LOCKOUT_DURATION_MINUTES",
               "CORS_ORIGINS", "ALLOWED_HOSTS",
               "FRONTEND_URL",
-              "GITHUB_USERNAME", "GIT_PERSONAL_ACCESS_TOKEN",
+              "GIT_USERNAME", "GIT_PERSONAL_ACCESS_TOKEN",
               "BUILD_IMAGE", "BUILD_TAG",
           ]
           with open(".env", "w") as handle:
@@ -223,7 +224,7 @@ jobs:
             cd /home/sbuild/spms-academic-hub
 
             # Extract credentials from .env
-            export GITHUB_USERNAME="$(grep -E '^GITHUB_USERNAME=' .env | cut -d= -f2-)"
+            export GIT_USERNAME="$(grep -E '^GIT_USERNAME=' .env | cut -d= -f2-)"
             export GIT_PERSONAL_ACCESS_TOKEN="$(grep -E '^GIT_PERSONAL_ACCESS_TOKEN=' .env | cut -d= -f2-)"
             export BUILD_IMAGE="$(grep -E '^BUILD_IMAGE=' .env | cut -d= -f2-)"
             export BUILD_TAG="$(grep -E '^BUILD_TAG=' .env | cut -d= -f2-)"
@@ -243,8 +244,8 @@ jobs:
             # Check API logs
             docker compose -f docker-compose.prod.yml logs --tail=50 api
 
-            # Health check (retry up to 36 times, 10s each = 6 minutes)
-            for i in $(seq 1 36); do
+            # Health check (retry up to 10 times, 10s each = 100 seconds)
+            for i in $(seq 1 10); do
               if curl -fsS http://localhost:8899/health >/dev/null 2>&1; then
                 echo "Health check passed on attempt $i"
                 exit 0
