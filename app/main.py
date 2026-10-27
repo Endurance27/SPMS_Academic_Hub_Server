@@ -67,8 +67,8 @@ app = FastAPI(
     description="SPMS Academic Hub",
     version=settings.API_VERSION,
     docs_url="/docs",
-    redoc_url=f"/api/{settings.API_VERSION}/redoc",
-    openapi_url=f"/api/{settings.API_VERSION}/openapi.json",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
 
@@ -92,7 +92,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 if settings.DOCS_USERNAME and settings.DOCS_PASSWORD:
     @app.middleware("http")
     async def docs_auth_middleware(request: Request, call_next):
-        if request.url.path in ["/docs", "/redoc", "/api/v1/docs", "/api/v1/redoc", "/api/v1/openapi.json"]:
+        if request.url.path in ["/docs", "/redoc", "/api/docs", "/api/redoc", "/api/openapi.json"]:
             auth = request.headers.get("authorization")
             if not auth or not auth.startswith("Basic "):
                 return Response(
@@ -133,7 +133,7 @@ async def health_check():
 
 
 # Include API Router
-app.include_router(api_router, prefix=f"/api/{settings.API_VERSION}")
+app.include_router(api_router, prefix="/api")
 
 
 if __name__ == "__main__":
