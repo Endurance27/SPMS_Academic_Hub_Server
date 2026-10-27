@@ -36,8 +36,14 @@ dev-install:
 up:
 	docker compose up -d
 	@echo "${GREEN}All services started!${RESET}"
-	@echo "API: http://localhost:8000"
-	@echo "Docs: http://localhost:8000/api/v1/docs"
+	@echo "API: http://localhost:8001"
+	@echo "Docs: http://localhost:8001/api/v1/docs"
+
+up-remote: ## Start services with remote database (no local Postgres)
+	docker compose -f docker-compose.remote.yml up -d
+	@echo "${GREEN}Services started with remote database!${RESET}"
+	@echo "API: http://localhost:8001"
+	@echo "Docs: http://localhost:8001/api/v1/docs"
 
 down:
 	docker compose down
