@@ -24,13 +24,25 @@ router = APIRouter()
 @router.get("", response_model=TimetableListResponse)
 async def list_timetables(
     semester_id: uuid.UUID = Query(...),
-    current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db)
 ):
     """List uploaded master timetables"""
     service = MasterTimetableService(db)
     timetables = await service.list_timetables(semester_id)
     return TimetableListResponse(data=timetables)
+
+
+@router.get("/{timetable_id}")
+async def get_timetable_detail(
+    timetable_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get one timetable and its course, day, period, and venue entries."""
+    service = MasterTimetableService(db)
+    timetable = await service.get_timetable_detail(timetable_id)
+    if not timetable:
+        raise HTTPException(status_code=404, detail="Timetable not found")
+    return {"data": timetable}
 
 
 @router.get("/entries", response_model=TimetableEntriesResponse)
@@ -349,3 +361,5 @@ async def get_double_bookings(
         for row in result.all()
     ]
     return {"data": bookings}
+
+

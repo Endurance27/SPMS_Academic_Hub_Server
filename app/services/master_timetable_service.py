@@ -61,6 +61,52 @@ class MasterTimetableService:
 
         return result
 
+    async def get_timetable_detail(self, timetable_id: uuid.UUID) -> Optional[Dict[str, Any]]:
+        """Return one timetable with its complete, ordered entry details."""
+        result = await self.db.execute(
+            select(MasterTimetable).where(MasterTimetable.id == timetable_id)
+        )
+        timetable = result.scalar_one_or_none()
+        if not timetable:
+            return None
+
+        entries_result = await self.db.execute(
+            select(MasterEntry)
+            .where(MasterEntry.timetable_id == timetable_id)
+            .order_by(MasterEntry.day, MasterEntry.period, MasterEntry.venue_code)
+        )
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        entries = []
+        for entry in entries_result.scalars().all():
+            period_start_hour = 7 + entry.period
+            entries.append({
+                "id": str(entry.id),
+                "level": entry.level,
+                "course_code": entry.subject,
+                "subject": entry.subject,
+                "day": entry.day,
+                "day_name": day_names[entry.day] if 0 <= entry.day < len(day_names) else None,
+                "period": entry.period,
+                "period_start": f"{period_start_hour:02d}:30",
+                "period_end": f"{period_start_hour + 1:02d}:20",
+                "venue_code": entry.venue_code,
+                "is_free": entry.is_free,
+                "department_id": str(entry.department_id) if entry.department_id else None,
+                "course_kind": entry.course_kind,
+            })
+
+        return {
+            "id": str(timetable.id),
+            "semester_id": str(timetable.semester_id),
+            "level": timetable.level,
+            "filename": timetable.filename,
+            "uploaded_by_id": str(timetable.uploaded_by_id),
+            "uploaded_at": timetable.uploaded_at.isoformat() if timetable.uploaded_at else None,
+            "version": timetable.version,
+            "entry_count": len(entries),
+            "entries": entries,
+        }
+
     async def get_entries(
         self,
         semester_id: uuid.UUID,
