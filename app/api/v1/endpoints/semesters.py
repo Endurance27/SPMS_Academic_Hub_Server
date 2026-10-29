@@ -19,7 +19,6 @@ router = APIRouter()
 
 @router.get("", response_model=SemesterListResponse)
 async def list_semesters(
-    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     service = SemesterService(db)
@@ -40,7 +39,6 @@ async def create_semester(
 @router.get("/{semester_id}", response_model=SemesterResponse)
 async def get_semester(
     semester_id: UUID,
-    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     service = SemesterService(db)
