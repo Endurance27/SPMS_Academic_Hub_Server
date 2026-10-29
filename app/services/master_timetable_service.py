@@ -3,10 +3,12 @@ import json
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from redis.asyncio import Redis
 
 from app.models.master_timetable import MasterTimetable, MasterEntry
+from app.models.timetable_upload import TimetableUpload
 from app.models.semester import Semester
 from app.models.venue import Venue
 from app.models.slot_request import SlotRequest
@@ -16,9 +18,25 @@ from app.utils.timetable_parser import TimetableParser
 
 
 class MasterTimetableService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, redis: Optional[Redis] = None):
         self.db = db
+        self.redis = redis
         self.repo = MasterTimetableRepository(db)
+
+    async def _store_preview(self, preview_id: str, data: Dict[str, Any]) -> None:
+        if self.redis is None:
+            raise RuntimeError("Redis is required to store timetable previews")
+        await self.redis.setex(
+            f"timetable_preview:{preview_id}", 1800, json.dumps(data)
+        )
+
+    async def _load_preview(self, preview_id: str) -> Dict[str, Any]:
+        if self.redis is None:
+            raise RuntimeError("Redis is required to retrieve timetable previews")
+        raw_data = await self.redis.get(f"timetable_preview:{preview_id}")
+        if not raw_data:
+            raise ValueError("Timetable preview was not found or has expired")
+        return json.loads(raw_data)
 
     async def list_timetables(self, semester_id: uuid.UUID) -> List[Dict]:
         """List all master timetables for a semester"""
@@ -111,7 +129,6 @@ class MasterTimetableService:
         parser = TimetableParser()
         parse_result = parser.parse_file(content, file_type, level, str(semester_id))
 
-        # Store preview in Redis (simulated with dict for now)
         preview_id = str(uuid.uuid4())
         preview_data = {
             "entries": parse_result["entries"],
@@ -121,9 +138,7 @@ class MasterTimetableService:
             "level": level,
             "filename": filename
         }
-
-        # In production, store in Redis with TTL
-        # await redis.setex(f"preview:{preview_id}", 1800, json.dumps(preview_data))
+        await self._store_preview(preview_id, preview_data)
 
         # Check if existing timetable(s) exist
         replaces = None
@@ -152,18 +167,70 @@ class MasterTimetableService:
         preview_id: str,
         uploaded_by_id: uuid.UUID
     ) -> str:
-        """Publish master timetable"""
-        # In production, retrieve from Redis
-        # preview_data = await redis.get(f"preview:{preview_id}")
-        # For now, this is a placeholder
+        """Persist the uploaded master timetable and its parsed entries."""
+        preview_data = await self._load_preview(preview_id)
+        semester_id = uuid.UUID(preview_data["semester_id"])
+        entries_by_level: Dict[int, List[Dict[str, Any]]] = {}
+        for entry in preview_data.get("entries", []):
+            entry_level = int(entry.get("level") or preview_data.get("level") or 0)
+            entries_by_level.setdefault(entry_level, []).append(entry)
+        if not entries_by_level:
+            raise ValueError("Cannot publish a timetable with no entries")
 
-        # This would:
-        # 1. Create MasterTimetable record
-        # 2. Create MasterEntry records
-        # 3. Record TimetableUpload
-        # 4. Update venue codes if needed
-        # 5. Check and notify affected slot requests
+        semester_result = await self.db.execute(
+            select(Semester).where(Semester.id == semester_id)
+        )
+        if not semester_result.scalar_one_or_none():
+            raise ValueError("Semester not found")
 
+        for level, level_entries in entries_by_level.items():
+            timetable = await self.repo.get_by_semester_and_level(semester_id, level)
+            if timetable:
+                timetable.version = (timetable.version or 1) + 1
+                timetable.filename = preview_data["filename"]
+                timetable.uploaded_by_id = uploaded_by_id
+                await self.db.execute(
+                    delete(MasterEntry).where(
+                        MasterEntry.timetable_id == timetable.id,
+                        MasterEntry.department_id.is_(None),
+                    )
+                )
+            else:
+                timetable = MasterTimetable(
+                    semester_id=semester_id,
+                    level=level,
+                    filename=preview_data["filename"],
+                    uploaded_by_id=uploaded_by_id,
+                    version=1,
+                )
+                self.db.add(timetable)
+                await self.db.flush()
+
+            self.db.add_all([
+                MasterEntry(
+                    timetable_id=timetable.id,
+                    level=level,
+                    day=int(entry["day"]),
+                    period=int(entry["period"]),
+                    subject=entry["subject"],
+                    venue_code=entry["venue_code"],
+                    is_free=bool(entry.get("is_free", False)),
+                    department_id=entry.get("department_id"),
+                    course_kind=entry.get("course_kind"),
+                )
+                for entry in level_entries
+            ])
+            self.db.add(TimetableUpload(
+                semester_id=semester_id,
+                level=level,
+                filename=preview_data["filename"],
+                uploaded_by_id=uploaded_by_id,
+                entry_count=len(level_entries),
+                kind="master",
+            ))
+
+        await self.db.commit()
+        await self.redis.delete(f"timetable_preview:{preview_id}")
         return "Timetable published successfully"
 
     async def preview_department_upload(
@@ -204,6 +271,14 @@ class MasterTimetableService:
 
         preview_id = str(uuid.uuid4())
 
+        preview_data = {
+            "entries": filtered_entries,
+            "semester_id": str(semester_id),
+            "department_id": str(department_id),
+            "filename": filename,
+        }
+        await self._store_preview(preview_id, preview_data)
+
         levels = sorted({e.get("level") for e in filtered_entries if e.get("level") is not None})
         venues = sorted({e.get("venue_code", e.get("venue", "")) for e in filtered_entries} - {""})
 
@@ -224,8 +299,76 @@ class MasterTimetableService:
         preview_id: str,
         uploaded_by_id: uuid.UUID
     ) -> str:
-        """Publish department timetable"""
-        # Similar to publish_timetable but for department-specific entries
+        """Persist department entries on their semester's master timetable."""
+        preview_data = await self._load_preview(preview_id)
+        semester_id = uuid.UUID(preview_data["semester_id"])
+        department_id = uuid.UUID(preview_data["department_id"])
+        entries = preview_data.get("entries", [])
+        if not entries:
+            raise ValueError("Cannot publish a department timetable with no entries")
+
+        semester_result = await self.db.execute(
+            select(Semester).where(Semester.id == semester_id)
+        )
+        if not semester_result.scalar_one_or_none():
+            raise ValueError("Semester not found")
+        dept_result = await self.db.execute(
+            select(Department).where(Department.id == department_id)
+        )
+        if not dept_result.scalar_one_or_none():
+            raise ValueError("Department not found")
+
+        # Replace this department's previously published entries for this semester.
+        timetable_ids = select(MasterTimetable.id).where(
+            MasterTimetable.semester_id == semester_id
+        )
+        await self.db.execute(delete(MasterEntry).where(
+            MasterEntry.timetable_id.in_(timetable_ids),
+            MasterEntry.department_id == department_id,
+        ))
+
+        entries_by_level: Dict[int, List[Dict[str, Any]]] = {}
+        for entry in entries:
+            level = int(entry.get("level") or 0)
+            entries_by_level.setdefault(level, []).append(entry)
+        for level, level_entries in entries_by_level.items():
+            timetable = await self.repo.get_by_semester_and_level(semester_id, level)
+            if not timetable:
+                timetable = MasterTimetable(
+                    semester_id=semester_id,
+                    level=level,
+                    filename=preview_data["filename"],
+                    uploaded_by_id=uploaded_by_id,
+                    version=1,
+                )
+                self.db.add(timetable)
+                await self.db.flush()
+            self.db.add_all([
+                MasterEntry(
+                    timetable_id=timetable.id,
+                    level=level,
+                    day=int(entry["day"]),
+                    period=int(entry["period"]),
+                    subject=entry["subject"],
+                    venue_code=entry["venue_code"],
+                    is_free=bool(entry.get("is_free", False)),
+                    department_id=department_id,
+                    course_kind=entry.get("course_kind"),
+                )
+                for entry in level_entries
+            ])
+            self.db.add(TimetableUpload(
+                semester_id=semester_id,
+                level=level,
+                filename=preview_data["filename"],
+                uploaded_by_id=uploaded_by_id,
+                entry_count=len(level_entries),
+                kind="department",
+                department_id=department_id,
+            ))
+
+        await self.db.commit()
+        await self.redis.delete(f"timetable_preview:{preview_id}")
         return "Department timetable published successfully"
 
     async def export_timetable(

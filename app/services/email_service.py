@@ -79,6 +79,7 @@ class EmailService:
         role: str,
         invitation_token: str,
         department_name: Optional[str] = None,
+        temporary_password: Optional[str] = None,
     ) -> bool:
         accept_url = f"{self._frontend_url}/accept-invitation?token={invitation_token}"
 
@@ -90,11 +91,26 @@ class EmailService:
 
         dept_line = f" for <strong>{department_name}</strong>" if department_name else ""
 
+        password_html = ""
+        password_text = ""
+        if temporary_password:
+            password_html = f"""
+            <div style="background: #f5f7fb; border-left: 4px solid #9a7100; padding: 16px 20px; margin: 24px 0;">
+                <p style="color: #0b3d91; font-weight: 600; margin: 0 0 8px;">Your temporary password</p>
+                <p style="color: #222; font-family: monospace; font-size: 16px; margin: 0;">{temporary_password}</p>
+                <p style="color: #555; font-size: 13px; margin: 8px 0 0;">You can use this to sign in. Please change it after your first login.</p>
+            </div>
+            """
+            password_text = (
+                f"Temporary password: {temporary_password}\n"
+                "Please change it after your first login.\n\n"
+            )
+
         subject = f"You've been invited to {self._sender_name}"
 
         html_body = f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 0;">
-            <h2 style="color: #1a1a2e; margin-bottom: 8px;">Welcome to {self._sender_name}</h2>
+            <h2 style="color: #0b3d91; margin-bottom: 8px;">Welcome to {self._sender_name}</h2>
             <p style="color: #444; line-height: 1.6;">
                 Hi {user_name},
             </p>
@@ -104,14 +120,15 @@ class EmailService:
             </p>
             <div style="text-align: center; margin: 32px 0;">
                 <a href="{accept_url}"
-                   style="display: inline-block; background: #2563eb; color: #fff; padding: 12px 32px;
+                   style="display: inline-block; background: #0b3d91; color: #fff; padding: 12px 32px;
                           border-radius: 6px; text-decoration: none; font-weight: 600;">
                     Accept Invitation
                 </a>
             </div>
+            {password_html}
             <p style="color: #888; font-size: 13px; line-height: 1.5;">
                 If the button doesn't work, copy and paste this link into your browser:<br/>
-                <a href="{accept_url}" style="color: #2563eb; word-break: break-all;">{accept_url}</a>
+                <a href="{accept_url}" style="color: #0b3d91; word-break: break-all;">{accept_url}</a>
             </p>
             <p style="color: #888; font-size: 13px;">
                 This invitation expires in 7 days. If you did not expect this email, you can safely ignore it.
@@ -122,6 +139,7 @@ class EmailService:
         text_body = (
             f"Hi {user_name},\n\n"
             f"You've been invited to join {self._sender_name} as a {role_label}{dept_line.replace('<strong>', '').replace('</strong>', '')}.\n\n"
+            f"{password_text}"
             f"Accept your invitation: {accept_url}\n\n"
             f"This invitation expires in 7 days."
         )

@@ -62,7 +62,13 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         subjects: Optional[List[str]] = None,
         day: Optional[int] = None
     ) -> List[MasterEntry]:
-        query = select(MasterEntry).where(MasterEntry.semester_id == semester_id)
+        # Semester is stored on MasterTimetable; entries point to their parent
+        # timetable through timetable_id.
+        query = (
+            select(MasterEntry)
+            .join(MasterTimetable, MasterEntry.timetable_id == MasterTimetable.id)
+            .where(MasterTimetable.semester_id == semester_id)
+        )
 
         if level is not None:
             query = query.where(MasterEntry.level == level)

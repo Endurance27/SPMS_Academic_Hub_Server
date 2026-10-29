@@ -27,21 +27,18 @@ class DepartmentService:
         self.email_service = EmailService()
 
     async def create_department(
-        self,
-        data: DepartmentCreate,
-        created_by_id: uuid.UUID,
-        generate_temp_password: bool = False
+        self, data: DepartmentCreate, created_by_id: uuid.UUID, generate_temp_password: bool = False
     ) -> tuple[Department, Optional[str]]:
         """Create a department with its admin account"""
         # Check if code or name already exists
         existing_by_code = await self.department_repo.get_by_code(data.code)
         if existing_by_code:
             raise ValueError("Department code already exists")
-        
+
         existing_by_name = await self.department_repo.get_by_name(data.name)
         if existing_by_name:
             raise ValueError("Department name already exists")
-        
+
         # Create department
         department = Department(
             name=data.name,
@@ -50,11 +47,11 @@ class DepartmentService:
             email=data.email,
             phone=data.phone,
             tone=data.tone,
-            subject_prefixes=data.subject_prefixes or []
+            subject_prefixes=data.subject_prefixes or [],
         )
         self.db.add(department)
         await self.db.flush()
-        
+
         # Create department settings with defaults
         settings = DepartmentSettings(
             department_id=department.id,
@@ -72,18 +69,21 @@ class DepartmentService:
             notify_graduation_submissions=True,
             notify_conflicts=True,
             email_channel=True,
-            in_app_channel=True
+            in_app_channel=True,
         )
         self.db.add(settings)
-        
+
         # Create department admin account
         temp_password = None
         if generate_temp_password:
-            temp_password = SecurityService.generate_temp_password()
-            hashed_password = SecurityService.get_password_hash(temp_password)
+            temp_password = SecurityService.generate_role_temp_password(
+                "department", data.phone
+            )
+            initial_password = temp_password
         else:
-            hashed_password = SecurityService.get_password_hash("ChangeMe123!")  # Will be forced to change
-        
+            initial_password = "ChangeMe123!"  # Will be forced to change
+        hashed_password = SecurityService.get_password_hash(initial_password)
+
         admin_user = User(
             email=data.email,
             hashed_password=hashed_password,
@@ -91,7 +91,7 @@ class DepartmentService:
             role=UserRole.DEPARTMENT,
             status=UserStatus.INVITED,
             department_id=department.id,
-            title="Department Administrator"
+            title="Department Administrator",
         )
         self.db.add(admin_user)
         await self.db.flush()
@@ -116,6 +116,7 @@ class DepartmentService:
             role="department",
             invitation_token=raw_token,
             department_name=data.name,
+            temporary_password=initial_password,
         )
 
         return department, temp_password
@@ -125,88 +126,101 @@ class DepartmentService:
         return await self.department_repo.get_with_stats(department_id)
 
     async def list_departments(
-        self,
-        search: Optional[str] = None,
-        skip: int = 0,
-        limit: int = 100
+        self, search: Optional[str] = None, skip: int = 0, limit: int = 100
     ) -> List[Department]:
         """List departments with optional search"""
         return await self.department_repo.list_with_counts(search, skip, limit)
 
     async def update_department(
-        self,
-        department_id: uuid.UUID,
-        data: DepartmentUpdate
+        self, department_id: uuid.UUID, data: DepartmentUpdate
     ) -> Optional[Department]:
         """Update department"""
         department = await self.department_repo.get_by_id(department_id)
         if not department:
             return None
-        
+
         # Check for duplicate code/name if changed
         if data.code and data.code != department.code:
             existing = await self.department_repo.get_by_code(data.code)
             if existing:
                 raise ValueError("Department code already exists")
-        
+
         if data.name and data.name != department.name:
             existing = await self.department_repo.get_by_name(data.name)
             if existing:
                 raise ValueError("Department name already exists")
-        
+
         # Update fields
         update_data = data.model_dump(exclude_unset=True)
         if update_data.get("code"):
             update_data["code"] = update_data["code"].upper()
-        
+
         for field, value in update_data.items():
             setattr(department, field, value)
-        
+
         await self.db.commit()
         await self.db.refresh(department)
-        
+
         return department
 
     async def delete_department(
-        self,
-        department_id: uuid.UUID,
-        force: bool = False,
-        lecturers_action: str = "disable"
+        self, department_id: uuid.UUID, force: bool = False, lecturers_action: str = "disable"
     ) -> bool:
         """Delete department with cascade handling"""
         department = await self.department_repo.get_by_id(department_id)
         if not department:
             return False
-        
+
         # Check for approved slot requests if not force
         if not force:
             from app.models.slot_request import SlotRequest, SlotRequestStatus
             from app.models.schedule_item import ScheduleItem
-            
+
             # Check for approved slot requests in active semester
             approved_requests = await self.db.execute(
-                select(func.count()).select_from(SlotRequest).where(
+                select(func.count())
+                .select_from(SlotRequest)
+                .where(
                     SlotRequest.department_id == department_id,
-                    SlotRequest.status == SlotRequestStatus.APPROVED
+                    SlotRequest.status == SlotRequestStatus.APPROVED,
                 )
             )
             if approved_requests.scalar() > 0:
-                raise ValueError("Cannot delete department with approved slot requests. Use force=true to override.")
-        
+                raise ValueError(
+                    "Cannot delete department with approved slot requests. Use force=true to override."
+                )
+
         # Handle lecturers
         if lecturers_action == "disable":
             await self.db.execute(
                 select(User).where(
-                    User.department_id == department_id,
-                    User.role == UserRole.LECTURER
+                    User.department_id == department_id, User.role == UserRole.LECTURER
                 )
             )
             # Update would go here - for now just cascade
-        
+
+        # Disassociate or delete users before removing the department.
+        # The users.department_id FK has no ON DELETE cascade, and the
+        # department admin's email must be freed so it can be reused.
+        department_users = (
+            (await self.db.execute(select(User).where(User.department_id == department_id)))
+            .scalars()
+            .all()
+        )
+
+        for user in department_users:
+            if user.role == UserRole.DEPARTMENT:
+                await self.db.delete(user)
+            elif user.role == UserRole.LECTURER and lecturers_action == "disable":
+                user.status = UserStatus.DISABLED
+                user.department_id = None
+            else:
+                user.department_id = None
+
         # Department will cascade delete programmes, courses, and disable admin
         await self.db.delete(department)
         await self.db.commit()
-        
+
         return True
 
     async def resend_invitation(self, department_id: uuid.UUID) -> Optional[User]:
