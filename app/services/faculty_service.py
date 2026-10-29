@@ -94,9 +94,10 @@ class FacultyService:
             if existing_staff.scalar_one_or_none():
                 raise ValueError("Staff ID already exists.")
 
-        hashed_password = SecurityService.get_password_hash(
-            SecurityService.generate_temp_password()
+        temporary_password = SecurityService.generate_role_temp_password(
+            "faculty", data.staff_id
         )
+        hashed_password = SecurityService.get_password_hash(temporary_password)
 
         effective_dept_id = data.department_id or department_id
 
@@ -139,6 +140,7 @@ class FacultyService:
             role="lecturer",
             invitation_token=raw_token,
             department_name=dept_name,
+            temporary_password=temporary_password,
         )
 
         return user

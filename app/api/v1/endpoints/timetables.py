@@ -2,8 +2,10 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import get_redis
 from app.core.deps import get_current_user, get_db
 from app.core.permissions import require_permission
 from app.models.user import User
@@ -61,7 +63,8 @@ async def preview_timetable(
     semester_id: uuid.UUID = Query(...),
     level: Optional[int] = Query(None, description="Level to parse (100-400). Omit to parse all levels."),
     current_user: User = Depends(require_permission("timetable.upload")),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ):
     """Preview master timetable upload.
 
@@ -69,7 +72,7 @@ async def preview_timetable(
     ``level`` to parse every sheet, or pass a specific level to parse
     only that sheet.
     """
-    service = MasterTimetableService(db)
+    service = MasterTimetableService(db, redis)
 
     if not file.filename or not file.filename.lower().endswith(('.xlsx', '.csv')):
         raise HTTPException(
@@ -95,10 +98,11 @@ async def preview_timetable(
 async def publish_timetable(
     data: TimetablePublishRequest,
     current_user: User = Depends(require_permission("timetable.upload")),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ):
     """Publish master timetable"""
-    service = MasterTimetableService(db)
+    service = MasterTimetableService(db, redis)
 
     result = await service.publish_timetable(
         preview_id=data.preview_id,
@@ -114,10 +118,11 @@ async def preview_department_timetable(
     semester_id: uuid.UUID = Query(...),
     department_id: uuid.UUID = Query(...),
     current_user: User = Depends(require_permission("timetable.department_upload")),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ):
     """Preview department timetable upload"""
-    service = MasterTimetableService(db)
+    service = MasterTimetableService(db, redis)
 
     if not file.filename or not file.filename.lower().endswith(('.xlsx', '.csv')):
         raise HTTPException(
@@ -143,10 +148,11 @@ async def preview_department_timetable(
 async def publish_department_timetable(
     data: TimetablePublishRequest,
     current_user: User = Depends(require_permission("timetable.department_upload")),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ):
     """Publish department timetable"""
-    service = MasterTimetableService(db)
+    service = MasterTimetableService(db, redis)
 
     result = await service.publish_department_timetable(
         preview_id=data.preview_id,

@@ -98,9 +98,10 @@ class ImportService:
                     outcome = "updated"
                     updated_count += 1
                 else:
-                    hashed_pw = SecurityService.get_password_hash(
-                        SecurityService.generate_temp_password()
+                    temporary_password = SecurityService.generate_role_temp_password(
+                        "student", student_number
                     )
+                    hashed_pw = SecurityService.get_password_hash(temporary_password)
                     new_user = User(
                         email=email,
                         hashed_password=hashed_pw,
@@ -203,9 +204,10 @@ class ImportService:
                 student = existing.scalar_one_or_none()
 
                 if not student:
-                    hashed_pw = SecurityService.get_password_hash(
-                        SecurityService.generate_temp_password()
+                    temporary_password = SecurityService.generate_role_temp_password(
+                        "student", student_number
                     )
+                    hashed_pw = SecurityService.get_password_hash(temporary_password)
                     student = User(
                         email=email,
                         hashed_password=hashed_pw,
