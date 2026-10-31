@@ -76,9 +76,26 @@ class MasterTimetableService:
             .order_by(MasterEntry.day, MasterEntry.period, MasterEntry.venue_code)
         )
         day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        shared_venues = {"DEPT", "ONLINE"}
+
+        all_entries = entries_result.scalars().all()
+
+        slot_subjects: Dict[tuple, set] = {}
+        for entry in all_entries:
+            if entry.is_free or entry.venue_code in shared_venues:
+                continue
+            key = (entry.venue_code, entry.day, entry.period)
+            slot_subjects.setdefault(key, set()).add(entry.subject)
+
+        double_booked_slots = {
+            k: v for k, v in slot_subjects.items() if len(v) > 1
+        }
+
         entries = []
-        for entry in entries_result.scalars().all():
+        for entry in all_entries:
             period_start_hour = 7 + entry.period
+            key = (entry.venue_code, entry.day, entry.period)
+            clashing = double_booked_slots.get(key)
             entries.append({
                 "id": str(entry.id),
                 "level": entry.level,
@@ -93,7 +110,20 @@ class MasterTimetableService:
                 "is_free": entry.is_free,
                 "department_id": str(entry.department_id) if entry.department_id else None,
                 "course_kind": entry.course_kind,
+                "double_booked": clashing is not None,
+                "clashing_subjects": sorted(clashing) if clashing else [],
             })
+
+        double_bookings = [
+            {
+                "venue": k[0],
+                "day": k[1],
+                "day_name": day_names[k[1]] if 0 <= k[1] < len(day_names) else None,
+                "period": k[2],
+                "subjects": sorted(v),
+            }
+            for k, v in double_booked_slots.items()
+        ]
 
         return {
             "id": str(timetable.id),
@@ -105,6 +135,8 @@ class MasterTimetableService:
             "version": timetable.version,
             "entry_count": len(entries),
             "entries": entries,
+            "double_bookings": double_bookings,
+            "double_booking_count": len(double_bookings),
         }
 
     async def get_entries(
