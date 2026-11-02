@@ -95,7 +95,7 @@ class FacultyService:
                 raise ValueError("Staff ID already exists.")
 
         temporary_password = SecurityService.generate_role_temp_password(
-            "faculty", data.staff_id
+            "lecturer", data.email
         )
         hashed_password = SecurityService.get_password_hash(temporary_password)
 

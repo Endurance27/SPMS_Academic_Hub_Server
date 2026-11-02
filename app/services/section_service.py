@@ -1,7 +1,7 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.supporting import Section
@@ -19,7 +19,7 @@ class SectionService:
         course_id: Optional[uuid.UUID] = None,
         skip: int = 0,
         limit: int = 25,
-    ) -> List[Section]:
+    ) -> Tuple[List[Section], int]:
         query = select(Section)
 
         if programme_id:
@@ -29,9 +29,13 @@ class SectionService:
         if course_id:
             query = query.where(Section.course_id == course_id)
 
-        query = query.offset(skip).limit(limit).order_by(Section.name)
+        total = (await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )).scalar()
+
+        query = query.order_by(Section.name).offset(skip).limit(limit)
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
     async def get_section(self, section_id: uuid.UUID) -> Optional[Section]:
         result = await self.db.execute(

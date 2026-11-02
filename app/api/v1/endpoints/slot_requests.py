@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.core.permissions import require_permission
 from app.models.user import User
+from app.schemas.pagination import PaginationMeta
 from app.schemas.slot_request import (
     SlotRequestCreate,
     SlotRequestCheckResponse,
@@ -77,18 +78,26 @@ async def list_slot_requests(
     status: Optional[str] = Query(None),
     semester_id: uuid.UUID = Query(...),
     department_id: Optional[uuid.UUID] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(require_permission("schedule.view")),
     db: AsyncSession = Depends(get_db)
 ):
     """List slot requests"""
     service = SlotRequestService(db)
-    requests, meta = await service.list_requests(
+    skip = (page - 1) * page_size
+    requests, total, tab_counts = await service.list_requests(
         status=status,
         semester_id=semester_id,
         department_id=department_id,
-        user=current_user
+        user=current_user,
+        skip=skip,
+        limit=page_size,
     )
-    return SlotRequestListResponse(data=requests, meta=meta)
+    return SlotRequestListResponse(
+        data=requests,
+        meta=PaginationMeta.build(page, page_size, total, counts=tab_counts),
+    )
 
 
 @router.delete("/{request_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -13,6 +13,7 @@ from app.schemas.programme import (
     ProgrammeResponse,
     ProgrammeListResponse
 )
+from app.schemas.pagination import PaginationMeta
 from app.services.programme_service import ProgrammeService
 
 router = APIRouter()
@@ -31,11 +32,11 @@ async def list_programmes(
 
     service = ProgrammeService(db)
     skip = (page - 1) * page_size
-    programmes = await service.list_programmes(department_id, skip, page_size)
+    programmes, total = await service.list_programmes(department_id, skip, page_size)
 
     return ProgrammeListResponse(
         data=programmes,
-        meta={"page": page, "page_size": page_size}
+        meta=PaginationMeta.build(page, page_size, total),
     )
 
 

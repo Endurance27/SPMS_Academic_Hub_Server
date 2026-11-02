@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db
 from app.core.permissions import require_permission
 from app.models.user import User, UserRole
+from app.schemas.pagination import PaginationMeta
 from app.schemas.report import ReportCreate, ReportListResponse, ReportResponse
 from app.services.report_service import ReportService
 
@@ -37,6 +38,8 @@ async def generate_report(
 async def list_reports(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
+    sort_by: Optional[str] = Query(None, pattern="^(created_at|report_type)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     current_user: User = Depends(require_permission("reports.view")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -46,11 +49,11 @@ async def list_reports(
         department_id = current_user.department_id
 
     skip = (page - 1) * page_size
-    reports = await service.list_reports(department_id, skip, page_size)
+    reports, total = await service.list_reports(department_id, skip, page_size)
 
     return ReportListResponse(
         data=reports,
-        meta={"page": page, "page_size": page_size},
+        meta=PaginationMeta.build(page, page_size, total, sort_by, order),
     )
 
 

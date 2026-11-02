@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.core.permissions import require_permission
 from app.models.user import User
+from app.schemas.pagination import PaginationMeta
 from app.schemas.semester import (
     SemesterCreate,
     SemesterUpdate,
@@ -22,8 +23,11 @@ async def list_semesters(
     db: AsyncSession = Depends(get_db)
 ):
     service = SemesterService(db)
-    semesters = await service.list_semesters()
-    return SemesterListResponse(data=semesters)
+    semesters, total = await service.list_semesters()
+    return SemesterListResponse(
+        data=semesters,
+        meta=PaginationMeta.build(1, total or 100, total),
+    )
 
 
 @router.post("", response_model=SemesterResponse, status_code=201)

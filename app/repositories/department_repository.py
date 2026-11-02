@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,19 +31,23 @@ class DepartmentRepository(BaseRepository[Department]):
         self,
         search: Optional[str] = None,
         skip: int = 0,
-        limit: int = 100
-    ) -> List[Department]:
+        limit: int = 100,
+    ) -> Tuple[List[Department], int]:
         query = select(Department)
-        
+
         if search:
             query = query.where(
                 (Department.name.ilike(f"%{search}%")) |
                 (Department.code.ilike(f"%{search}%"))
             )
-        
-        query = query.offset(skip).limit(limit)
+
+        total = (await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )).scalar()
+
+        query = query.order_by(Department.name).offset(skip).limit(limit)
         result = await self.db.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all()), total
 
     async def get_with_stats(self, department_id: uuid.UUID) -> Optional[dict]:
         """Get department with counts of related entities"""

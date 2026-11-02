@@ -201,15 +201,26 @@ class SlotRequestService:
         status: Optional[str],
         semester_id: uuid.UUID,
         department_id: Optional[uuid.UUID],
-        user: User
-    ) -> tuple[List[Dict], Dict]:
-        """List slot requests"""
-        requests = await self.repo.list_filtered(
+        user: User,
+        skip: int = 0,
+        limit: int = 25,
+    ) -> tuple[List[Dict], int, Dict]:
+        """List slot requests with pagination. Returns (items, total, tab_counts)."""
+        requests, total = await self.repo.list_filtered(
             status=status,
             semester_id=semester_id,
             department_id=department_id,
             user_role=user.role,
-            user_department_id=user.department_id
+            user_department_id=user.department_id,
+            skip=skip,
+            limit=limit,
+        )
+
+        tab_counts = await self.repo.count_by_status(
+            semester_id=semester_id,
+            department_id=department_id,
+            user_role=user.role,
+            user_department_id=user.department_id,
         )
 
         result = []
@@ -249,13 +260,7 @@ class SlotRequestService:
                 "competing": competing
             })
 
-        # Meta counts
-        meta = {"Pending": 0, "Approved": 0, "Returned": 0, "All": len(result)}
-        for req in requests:
-            if req.status.value in meta:
-                meta[req.status.value] += 1
-
-        return result, meta
+        return result, total, tab_counts
 
     async def withdraw_request(self, request_id: uuid.UUID, user: User) -> None:
         """Withdraw pending slot request"""

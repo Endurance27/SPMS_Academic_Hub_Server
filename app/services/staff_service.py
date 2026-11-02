@@ -28,7 +28,22 @@ class StaffService:
         search: Optional[str] = None,
         skip: int = 0,
         limit: int = 25,
-    ) -> tuple[List[dict], dict]:
+    ) -> tuple[List[dict], int, dict]:
+        base_query = select(User.id).where(User.role != UserRole.STUDENT)
+        if role:
+            base_query = base_query.where(User.role == role)
+        if status:
+            base_query = base_query.where(User.status == status)
+        if search:
+            base_query = base_query.where(
+                User.name.ilike(f"%{search}%") | User.email.ilike(f"%{search}%")
+            )
+
+        total_result = await self.db.execute(
+            select(func.count()).select_from(base_query.subquery())
+        )
+        total = total_result.scalar()
+
         query = (
             select(
                 User,
@@ -50,8 +65,6 @@ class StaffService:
                 User.name.ilike(f"%{search}%") | User.email.ilike(f"%{search}%")
             )
 
-        # Tab counts
-        base_filter = User.role != UserRole.STUDENT
         admin_count = await self._count_by_role(
             [UserRole.SUPER, UserRole.DEPARTMENT], search
         )
@@ -84,7 +97,7 @@ class StaffService:
             "All": admin_count + faculty_count,
         }
 
-        return staff_list, counts
+        return staff_list, total, counts
 
     async def _count_by_role(
         self, roles: list, search: Optional[str] = None
@@ -112,7 +125,7 @@ class StaffService:
                 raise ValueError("Staff ID already exists.")
 
         temporary_password = SecurityService.generate_role_temp_password(
-            "staff", data.staff_id
+            "staff", data.email
         )
         hashed_password = SecurityService.get_password_hash(temporary_password)
 

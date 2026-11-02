@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File, status
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,33 +16,31 @@ from app.schemas.master_timetable import (
     TimetableListResponse,
     TimetableEntriesResponse,
 )
-from app.services.master_timetable_service import MasterTimetableService
+from app.schemas.pagination import PaginationMeta
+from app.services.master_timetable_service import MasterTimetableService, sync_venues_from_codes
 
 router = APIRouter()
 
 
+# ── Static GET paths (must come before /{timetable_id}) ─────────────
+
 @router.get("", response_model=TimetableListResponse)
 async def list_timetables(
     semester_id: uuid.UUID = Query(...),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db)
 ):
     """List uploaded master timetables"""
     service = MasterTimetableService(db)
     timetables = await service.list_timetables(semester_id)
-    return TimetableListResponse(data=timetables)
-
-
-@router.get("/{timetable_id}")
-async def get_timetable_detail(
-    timetable_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    """Get one timetable and its course, day, period, and venue entries."""
-    service = MasterTimetableService(db)
-    timetable = await service.get_timetable_detail(timetable_id)
-    if not timetable:
-        raise HTTPException(status_code=404, detail="Timetable not found")
-    return {"data": timetable}
+    total = len(timetables)
+    start = (page - 1) * page_size
+    paged = timetables[start:start + page_size]
+    return TimetableListResponse(
+        data=paged,
+        meta=PaginationMeta.build(page, page_size, total),
+    )
 
 
 @router.get("/entries", response_model=TimetableEntriesResponse)
@@ -55,7 +53,7 @@ async def get_timetable_entries(
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get master timetable entries"""
+    """Get all timetable entries (master + department combined)"""
     service = MasterTimetableService(db)
     subjects_list = subjects.split(",") if subjects else None
 
@@ -69,109 +67,56 @@ async def get_timetable_entries(
     return TimetableEntriesResponse(data=entries, meta=meta)
 
 
-@router.post("/preview", response_model=TimetablePreviewResponse)
-async def preview_timetable(
-    file: UploadFile = File(...),
+@router.get("/master-entries", response_model=TimetableEntriesResponse)
+async def get_master_only_entries(
     semester_id: uuid.UUID = Query(...),
-    level: Optional[int] = Query(None, description="Level to parse (100-400). Omit to parse all levels."),
-    current_user: User = Depends(require_permission("timetable.upload")),
+    level: Optional[int] = Query(None),
+    venue: Optional[str] = Query(None),
+    subjects: Optional[str] = Query(None),
+    day: Optional[int] = Query(None),
+    current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
 ):
-    """Preview master timetable upload.
+    """Get master timetable entries only (broad department codes like DCIT, MATH, STAT)"""
+    service = MasterTimetableService(db)
+    subjects_list = subjects.split(",") if subjects else None
 
-    For Excel files with multiple sheets (L100v1, L200v1, ...) omit
-    ``level`` to parse every sheet, or pass a specific level to parse
-    only that sheet.
-    """
-    service = MasterTimetableService(db, redis)
-
-    if not file.filename or not file.filename.lower().endswith(('.xlsx', '.csv')):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Upload the master timetable as an Excel (.xlsx) or CSV file"
-        )
-
-    content = await file.read()
-    file_type = file.filename.lower().split('.')[-1]
-
-    result = await service.preview_upload(
-        content=content,
-        file_type=file_type,
+    entries, meta = await service.get_entries(
         semester_id=semester_id,
-        level=level or 0,
-        filename=file.filename
+        level=level,
+        venue_code=venue,
+        subjects=subjects_list,
+        day=day,
+        source="master",
     )
-
-    return result
-
-
-@router.post("/publish", status_code=status.HTTP_200_OK)
-async def publish_timetable(
-    data: TimetablePublishRequest,
-    current_user: User = Depends(require_permission("timetable.upload")),
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-):
-    """Publish master timetable"""
-    service = MasterTimetableService(db, redis)
-
-    result = await service.publish_timetable(
-        preview_id=data.preview_id,
-        uploaded_by_id=current_user.id
-    )
-
-    return {"message": result}
+    return TimetableEntriesResponse(data=entries, meta=meta)
 
 
-@router.post("/department/preview", response_model=DepartmentTimetablePreviewResponse)
-async def preview_department_timetable(
-    file: UploadFile = File(...),
+@router.get("/department-entries", response_model=TimetableEntriesResponse)
+async def get_department_entries(
     semester_id: uuid.UUID = Query(...),
-    department_id: uuid.UUID = Query(...),
-    current_user: User = Depends(require_permission("timetable.department_upload")),
+    department_id: Optional[uuid.UUID] = Query(None),
+    level: Optional[int] = Query(None),
+    venue: Optional[str] = Query(None),
+    subjects: Optional[str] = Query(None),
+    day: Optional[int] = Query(None),
+    current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
 ):
-    """Preview department timetable upload"""
-    service = MasterTimetableService(db, redis)
+    """Get department timetable entries (specific courses like DCIT111, MATH201)"""
+    service = MasterTimetableService(db)
+    subjects_list = subjects.split(",") if subjects else None
 
-    if not file.filename or not file.filename.lower().endswith(('.xlsx', '.csv')):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Upload the department timetable as an Excel (.xlsx) or CSV file"
-        )
-
-    content = await file.read()
-    file_type = file.filename.lower().split('.')[-1]
-
-    result = await service.preview_department_upload(
-        content=content,
-        file_type=file_type,
+    entries, meta = await service.get_entries(
         semester_id=semester_id,
+        level=level,
+        venue_code=venue,
+        subjects=subjects_list,
+        day=day,
+        source="department",
         department_id=department_id,
-        filename=file.filename
     )
-
-    return result
-
-
-@router.post("/department/publish", status_code=status.HTTP_200_OK)
-async def publish_department_timetable(
-    data: TimetablePublishRequest,
-    current_user: User = Depends(require_permission("timetable.department_upload")),
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-):
-    """Publish department timetable"""
-    service = MasterTimetableService(db, redis)
-
-    result = await service.publish_department_timetable(
-        preview_id=data.preview_id,
-        uploaded_by_id=current_user.id
-    )
-
-    return {"message": result}
+    return TimetableEntriesResponse(data=entries, meta=meta)
 
 
 @router.get("/template")
@@ -221,14 +166,222 @@ async def export_timetable(
 @router.get("/history")
 async def get_upload_history(
     semester_id: uuid.UUID = Query(...),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db)
 ):
     """Get timetable upload history"""
     service = MasterTimetableService(db)
     history = await service.get_upload_history(semester_id)
-    return {"data": history}
+    total = len(history)
+    start = (page - 1) * page_size
+    paged = history[start:start + page_size]
+    return {
+        "data": paged,
+        "meta": PaginationMeta.build(page, page_size, total),
+    }
 
+
+@router.get("/double-bookings")
+async def get_double_bookings(
+    semester_id: uuid.UUID = Query(...),
+    source: Optional[str] = Query(
+        None, description="Filter by source: 'master', 'department', or omit for department-only (default)"
+    ),
+    current_user: User = Depends(require_permission("timetable.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Find venue cells where multiple distinct subjects are booked.
+
+    Defaults to checking department entries only, since master entries
+    carry broad codes (DCIT) that would false-positive against specific
+    department courses (DCIT111).
+    """
+    from sqlalchemy.future import select
+    from sqlalchemy import func
+    from app.models.master_timetable import MasterTimetable, MasterEntry
+
+    result = await db.execute(
+        select(MasterTimetable.id).where(MasterTimetable.semester_id == semester_id)
+    )
+    timetable_ids = [row[0] for row in result.all()]
+    if not timetable_ids:
+        return {"data": []}
+
+    filters = [
+        MasterEntry.timetable_id.in_(timetable_ids),
+        MasterEntry.venue_code.notin_(["DEPT", "ONLINE"]),
+    ]
+
+    check_source = source or "department"
+    if check_source == "master":
+        filters.append(MasterEntry.department_id.is_(None))
+    elif check_source == "department":
+        filters.append(MasterEntry.department_id.isnot(None))
+
+    result = await db.execute(
+        select(
+            MasterEntry.venue_code,
+            MasterEntry.day,
+            MasterEntry.period,
+            func.array_agg(func.distinct(MasterEntry.subject)),
+            func.count(func.distinct(MasterEntry.subject)),
+        )
+        .where(*filters)
+        .group_by(MasterEntry.venue_code, MasterEntry.day, MasterEntry.period)
+        .having(func.count(func.distinct(MasterEntry.subject)) > 1)
+    )
+
+    bookings = [
+        {"venue": row[0], "day": row[1], "period": row[2], "subjects": row[3]}
+        for row in result.all()
+    ]
+    return {"data": bookings}
+
+
+# ── Dynamic path routes ─────────────────────────────────────────────
+
+@router.get("/{timetable_id}")
+async def get_timetable_detail(
+    timetable_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get one timetable and its course, day, period, and venue entries."""
+    service = MasterTimetableService(db)
+    timetable = await service.get_timetable_detail(timetable_id)
+    if not timetable:
+        raise HTTPException(status_code=404, detail="Timetable not found")
+    return {"data": timetable}
+
+
+@router.delete("/{timetable_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_timetable(
+    timetable_id: uuid.UUID,
+    current_user: User = Depends(require_permission("timetable.upload")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a master timetable and all its entries."""
+    service = MasterTimetableService(db)
+    deleted = await service.delete_timetable(timetable_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Timetable not found")
+
+
+# ── POST routes (no path conflict) ─────────────────────────────────
+
+@router.post("/preview", response_model=TimetablePreviewResponse)
+async def preview_timetable(
+    file: UploadFile = File(...),
+    semester_id: uuid.UUID = Query(...),
+    level: Optional[int] = Query(None, description="Level to parse (100-400). Omit to parse all levels."),
+    current_user: User = Depends(require_permission("timetable.upload")),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+):
+    """Preview master timetable upload.
+
+    For Excel files with multiple sheets (L100v1, L200v1, ...) omit
+    ``level`` to parse every sheet, or pass a specific level to parse
+    only that sheet.
+    """
+    service = MasterTimetableService(db, redis)
+
+    if not file.filename or not file.filename.lower().endswith(('.xlsx', '.csv')):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Upload the master timetable as an Excel (.xlsx) or CSV file"
+        )
+
+    content = await file.read()
+    file_type = file.filename.lower().split('.')[-1]
+
+    result = await service.preview_upload(
+        content=content,
+        file_type=file_type,
+        semester_id=semester_id,
+        level=level or 0,
+        filename=file.filename
+    )
+
+    return result
+
+
+@router.post("/publish", status_code=status.HTTP_200_OK)
+async def publish_timetable(
+    data: TimetablePublishRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_permission("timetable.upload")),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+):
+    """Publish master timetable"""
+    service = MasterTimetableService(db, redis)
+
+    result = await service.publish_timetable(
+        preview_id=data.preview_id,
+        uploaded_by_id=current_user.id
+    )
+
+    background_tasks.add_task(sync_venues_from_codes, result["venue_codes"])
+
+    return {"message": result["message"]}
+
+
+@router.post("/department/preview", response_model=DepartmentTimetablePreviewResponse)
+async def preview_department_timetable(
+    file: UploadFile = File(...),
+    semester_id: uuid.UUID = Query(...),
+    department_id: uuid.UUID = Query(...),
+    current_user: User = Depends(require_permission("timetable.department_upload")),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+):
+    """Preview department timetable upload"""
+    service = MasterTimetableService(db, redis)
+
+    if not file.filename or not file.filename.lower().endswith(('.xlsx', '.csv')):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Upload the department timetable as an Excel (.xlsx) or CSV file"
+        )
+
+    content = await file.read()
+    file_type = file.filename.lower().split('.')[-1]
+
+    result = await service.preview_department_upload(
+        content=content,
+        file_type=file_type,
+        semester_id=semester_id,
+        department_id=department_id,
+        filename=file.filename
+    )
+
+    return result
+
+
+@router.post("/department/publish", status_code=status.HTTP_200_OK)
+async def publish_department_timetable(
+    data: TimetablePublishRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_permission("timetable.department_upload")),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+):
+    """Publish department timetable"""
+    service = MasterTimetableService(db, redis)
+
+    result = await service.publish_department_timetable(
+        preview_id=data.preview_id,
+        uploaded_by_id=current_user.id
+    )
+
+    background_tasks.add_task(sync_venues_from_codes, result["venue_codes"])
+
+    return {"message": result["message"]}
+
+
+# ── Entry-level CRUD (sub-path with {entry_id}) ────────────────────
 
 @router.patch("/entries/{entry_id}")
 async def update_entry(
@@ -320,46 +473,3 @@ async def delete_entry(
 
     await db.delete(entry)
     await db.commit()
-
-
-@router.get("/double-bookings")
-async def get_double_bookings(
-    semester_id: uuid.UUID = Query(...),
-    current_user: User = Depends(require_permission("timetable.view")),
-    db: AsyncSession = Depends(get_db)
-):
-    """Find cells with multiple subjects (excluding shared venues)"""
-    from sqlalchemy.future import select
-    from sqlalchemy import func
-    from app.models.master_timetable import MasterTimetable, MasterEntry
-
-    result = await db.execute(
-        select(MasterTimetable.id).where(MasterTimetable.semester_id == semester_id)
-    )
-    timetable_ids = [row[0] for row in result.all()]
-    if not timetable_ids:
-        return {"data": []}
-
-    result = await db.execute(
-        select(
-            MasterEntry.venue_code,
-            MasterEntry.day,
-            MasterEntry.period,
-            func.array_agg(func.distinct(MasterEntry.subject)),
-            func.count(func.distinct(MasterEntry.subject)),
-        )
-        .where(
-            MasterEntry.timetable_id.in_(timetable_ids),
-            MasterEntry.venue_code.notin_(["DEPT", "ONLINE"]),
-        )
-        .group_by(MasterEntry.venue_code, MasterEntry.day, MasterEntry.period)
-        .having(func.count(func.distinct(MasterEntry.subject)) > 1)
-    )
-
-    bookings = [
-        {"venue": row[0], "day": row[1], "period": row[2], "subjects": row[3]}
-        for row in result.all()
-    ]
-    return {"data": bookings}
-
-

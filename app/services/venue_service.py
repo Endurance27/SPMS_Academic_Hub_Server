@@ -48,8 +48,8 @@ class VenueService:
         status: Optional[str] = None,
         search: Optional[str] = None,
         skip: int = 0,
-        limit: int = 100
-    ) -> List[Venue]:
+        limit: int = 100,
+    ) -> tuple[list, int]:
         return await self.venue_repo.list_all(venue_type, status, search, skip, limit)
 
     async def update_venue(

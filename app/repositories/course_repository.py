@@ -53,23 +53,28 @@ class CourseRepository(BaseRepository[Course]):
         search: Optional[str] = None,
         skip: int = 0,
         limit: int = 100
-    ) -> List[Course]:
+    ) -> tuple[list, int]:
         query = select(Course)
-        
+
         if department_id:
             query = query.where(Course.department_id == department_id)
         if lecturer_id:
             query = query.where(Course.lecturer_id == lecturer_id)
-        
+
         if search:
             query = query.where(
                 (Course.code.ilike(f"%{search}%")) |
                 (Course.title.ilike(f"%{search}%"))
             )
-        
-        query = query.offset(skip).limit(limit)
+
+        count_result = await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )
+        total = count_result.scalar()
+
+        query = query.order_by(Course.code).offset(skip).limit(limit)
         result = await self.db.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all()), total
 
     async def count_without_lecturer(self, department_id: uuid.UUID) -> int:
         result = await self.db.execute(

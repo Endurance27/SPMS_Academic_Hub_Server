@@ -13,6 +13,7 @@ from app.schemas.imports import (
     ImportRowListResponse,
     ImportRowResponse,
 )
+from app.schemas.pagination import PaginationMeta
 from app.services.import_service import ImportService
 
 router = APIRouter()
@@ -128,13 +129,13 @@ async def list_imports(
         dept_id = current_user.department_id
 
     skip = (page - 1) * page_size
-    imports = await service.list_imports(
+    imports, total = await service.list_imports(
         kind=kind, department_id=dept_id, skip=skip, limit=page_size
     )
 
     return ImportListResponse(
         data=[ImportResponse.model_validate(i) for i in imports],
-        meta={"page": page, "pageSize": page_size},
+        meta=PaginationMeta.build(page, page_size, total),
     )
 
 
@@ -165,9 +166,9 @@ async def get_import_rows(
 ):
     service = ImportService(db)
     skip = (page - 1) * page_size
-    rows = await service.get_import_rows(import_id, skip=skip, limit=page_size)
+    rows, total = await service.get_import_rows(import_id, skip=skip, limit=page_size)
 
     return ImportRowListResponse(
         data=[ImportRowResponse.model_validate(r) for r in rows],
-        meta={"page": page, "pageSize": page_size},
+        meta=PaginationMeta.build(page, page_size, total),
     )

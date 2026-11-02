@@ -15,29 +15,19 @@ class NotificationRepository(BaseRepository[Notification]):
         super().__init__(Notification, db)
 
     async def get_user_notifications(
-        self, user_id: uuid.UUID, unread_only: bool = False, limit: int = 50
-    ) -> List[Notification]:
+        self, user_id: uuid.UUID, unread_only: bool = False, skip: int = 0, limit: int = 50
+    ) -> tuple[list, int]:
         """Get notifications for a user - includes direct messages and broadcasts"""
-        # Query notifications that are either:
-        # 1. Directly addressed to this user (recipient_id = user_id)
-        # 2. Broadcasts to this user's role (audience_role = user.role and audience_department_id is null or matches)
-        # 3. Broadcasts to this user's department (audience_department_id = user.department_id)
-
-        # First, get the user to check their role and department
         from app.models.user import User
         user_result = await self.db.execute(select(User).where(User.id == user_id))
         user = user_result.scalar_one_or_none()
 
         if not user:
-            return []
+            return [], 0
 
-        # Build the query with OR conditions
         conditions = []
-
-        # Direct messages
         conditions.append(Notification.recipient_id == user_id)
 
-        # Role-based broadcasts
         if user.role:
             conditions.append(
                 and_(
@@ -46,11 +36,9 @@ class NotificationRepository(BaseRepository[Notification]):
                 )
             )
 
-        # Department-based broadcasts
         if user.department_id:
             conditions.append(Notification.audience_department_id == user.department_id)
 
-        # Also check role + department broadcasts
         if user.role and user.department_id:
             conditions.append(
                 and_(
@@ -59,29 +47,28 @@ class NotificationRepository(BaseRepository[Notification]):
                 )
             )
 
-        query = select(Notification).where(
-            or_(*conditions) if len(conditions) > 1 else conditions[0]
-        )
+        where_clause = or_(*conditions) if len(conditions) > 1 else conditions[0]
 
-        # If unread_only, filter by checking notification_reads table
+        base_query = select(Notification).where(where_clause)
+
         if unread_only:
-            # Subquery to get read notification IDs for this user
             read_ids_subquery = select(NotificationRead.notification_id).where(
                 NotificationRead.user_id == user_id
             )
-            query = query.where(~Notification.id.in_(read_ids_subquery))
+            base_query = base_query.where(~Notification.id.in_(read_ids_subquery))
 
-        query = query.order_by(Notification.created_at.desc()).limit(limit)
+        count_result = await self.db.execute(
+            select(func.count()).select_from(base_query.subquery())
+        )
+        total = count_result.scalar()
 
-        # Eager load reads to check read status
+        query = base_query.order_by(Notification.created_at.desc()).offset(skip).limit(limit)
         query = query.options(selectinload(Notification.reads))
 
         result = await self.db.execute(query)
         notifications = list(result.scalars().all())
 
-        # Add computed is_read and read_at attributes for backward compatibility
         for notification in notifications:
-            # Check if this user has read this notification
             read_record = None
             for read in notification.reads:
                 if read.user_id == user_id:
@@ -91,7 +78,7 @@ class NotificationRepository(BaseRepository[Notification]):
             notification.is_read = read_record is not None
             notification.read_at = read_record.read_at if read_record else None
 
-        return notifications
+        return notifications, total
 
     async def mark_as_read(self, notification_ids: List[uuid.UUID], user_id: uuid.UUID) -> None:
         """Mark notifications as read for a specific user"""

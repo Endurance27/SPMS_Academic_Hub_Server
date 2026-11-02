@@ -1,6 +1,8 @@
+import asyncio
+import logging
 import uuid
 import json
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
 from datetime import datetime
 
 from sqlalchemy import select, and_, or_, delete
@@ -11,10 +13,63 @@ from app.models.master_timetable import MasterTimetable, MasterEntry
 from app.models.timetable_upload import TimetableUpload
 from app.models.semester import Semester
 from app.models.venue import Venue
+from app.models.venue import VenueType, VenueStatus
 from app.models.slot_request import SlotRequest
 from app.models.department import Department
 from app.repositories.master_timetable_repository import MasterTimetableRepository
 from app.utils.timetable_parser import TimetableParser
+
+logger = logging.getLogger(__name__)
+
+SKIP_VENUE_CODES = {"DEPT", "ONLINE", "FREE", "TBA", "TBD", "N/A", ""}
+
+
+async def sync_venues_from_codes(venue_codes: Set[str]) -> None:
+    """Create Venue rows for codes that don't exist yet.
+
+    Runs in its own DB session so it can be called from a background task
+    without depending on the request's session lifecycle.
+    """
+    from app.core.database import AsyncSessionLocal
+
+    codes = {c.upper().strip() for c in venue_codes} - SKIP_VENUE_CODES
+    if not codes:
+        return
+
+    async with AsyncSessionLocal() as db:
+        try:
+            result = await db.execute(
+                select(Venue.code).where(Venue.code.in_(codes))
+            )
+            existing = {row[0] for row in result.all()}
+            new_codes = codes - existing
+
+            if not new_codes:
+                return
+
+            for code in new_codes:
+                import re
+                match = re.match(r"^([A-Za-z]+)(\d+.*)$", code)
+                if match:
+                    building = match.group(1)
+                    room = match.group(2)
+                else:
+                    building = code
+                    room = "-"
+
+                db.add(Venue(
+                    code=code,
+                    building=building,
+                    room_number=room,
+                    type=VenueType.LECTURE_HALL,
+                    status=VenueStatus.AVAILABLE,
+                ))
+
+            await db.commit()
+            logger.info("Auto-created %d venue(s): %s", len(new_codes), ", ".join(sorted(new_codes)))
+        except Exception:
+            await db.rollback()
+            logger.exception("Failed to sync venues from timetable upload")
 
 
 class MasterTimetableService:
@@ -80,16 +135,24 @@ class MasterTimetableService:
 
         all_entries = entries_result.scalars().all()
 
-        slot_subjects: Dict[tuple, set] = {}
+        master_slot_subjects: Dict[tuple, set] = {}
+        dept_slot_subjects: Dict[tuple, set] = {}
         for entry in all_entries:
             if entry.is_free or entry.venue_code in shared_venues:
                 continue
             key = (entry.venue_code, entry.day, entry.period)
-            slot_subjects.setdefault(key, set()).add(entry.subject)
+            if entry.department_id is None:
+                master_slot_subjects.setdefault(key, set()).add(entry.subject)
+            else:
+                dept_slot_subjects.setdefault(key, set()).add(entry.subject)
 
-        double_booked_slots = {
-            k: v for k, v in slot_subjects.items() if len(v) > 1
-        }
+        double_booked_slots: Dict[tuple, set] = {}
+        for k, v in master_slot_subjects.items():
+            if len(v) > 1:
+                double_booked_slots[k] = v
+        for k, v in dept_slot_subjects.items():
+            if len(v) > 1:
+                double_booked_slots[k] = v
 
         entries = []
         for entry in all_entries:
@@ -139,44 +202,73 @@ class MasterTimetableService:
             "double_booking_count": len(double_bookings),
         }
 
+    async def delete_timetable(self, timetable_id: uuid.UUID) -> bool:
+        """Delete a master timetable and all its entries (cascade)."""
+        result = await self.db.execute(
+            select(MasterTimetable).where(MasterTimetable.id == timetable_id)
+        )
+        timetable = result.scalar_one_or_none()
+        if not timetable:
+            return False
+
+        await self.db.execute(
+            delete(MasterEntry).where(MasterEntry.timetable_id == timetable_id)
+        )
+        await self.db.delete(timetable)
+        await self.db.commit()
+        return True
+
     async def get_entries(
         self,
         semester_id: uuid.UUID,
         level: Optional[int] = None,
         venue_code: Optional[str] = None,
         subjects: Optional[List[str]] = None,
-        day: Optional[int] = None
+        day: Optional[int] = None,
+        source: Optional[str] = None,
+        department_id: Optional[uuid.UUID] = None,
     ) -> tuple[List[Dict], Dict]:
-        """Get master timetable entries with filtering"""
+        """Get timetable entries with filtering.
+
+        ``source`` can be ``"master"`` (department_id IS NULL) or
+        ``"department"`` (department_id IS NOT NULL).
+        """
         entries = await self.repo.get_entries(
             semester_id=semester_id,
             level=level,
             venue_code=venue_code,
             subjects=subjects,
-            day=day
+            day=day,
+            source=source,
+            department_id=department_id,
         )
 
-        # Calculate meta counts
         meta = {}
         if level is None:
-            # Count per level
             levels = [100, 200, 300, 400]
             for lvl in levels:
-                level_entries = await self.repo.get_entries(semester_id, level=lvl)
+                level_entries = await self.repo.get_entries(
+                    semester_id, level=lvl, source=source, department_id=department_id,
+                )
                 meta[f"level_{lvl}_count"] = len(level_entries)
                 meta[f"level_{lvl}_free"] = sum(1 for e in level_entries if e.is_free)
 
         meta["total_count"] = len(entries)
         meta["free_count"] = sum(1 for e in entries if e.is_free)
 
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
         result = []
         for entry in entries:
+            period_start_hour = 7 + entry.period
             result.append({
                 "id": str(entry.id),
                 "timetable_id": str(entry.timetable_id),
                 "level": entry.level,
                 "day": entry.day,
+                "day_name": day_names[entry.day] if 0 <= entry.day < len(day_names) else None,
                 "period": entry.period,
+                "period_start": f"{period_start_hour:02d}:30",
+                "period_end": f"{period_start_hour + 1:02d}:20",
                 "subject": entry.subject,
                 "venue_code": entry.venue_code,
                 "is_free": entry.is_free,
@@ -244,7 +336,7 @@ class MasterTimetableService:
         self,
         preview_id: str,
         uploaded_by_id: uuid.UUID
-    ) -> str:
+    ) -> Dict[str, Any]:
         """Persist the uploaded master timetable and its parsed entries."""
         preview_data = await self._load_preview(preview_id)
         semester_id = uuid.UUID(preview_data["semester_id"])
@@ -307,9 +399,13 @@ class MasterTimetableService:
                 kind="master",
             ))
 
+        venue_codes = {
+            e.get("venue_code", "") for entries in entries_by_level.values() for e in entries
+        }
+
         await self.db.commit()
         await self.redis.delete(f"timetable_preview:{preview_id}")
-        return "Timetable published successfully"
+        return {"message": "Timetable published successfully", "venue_codes": venue_codes}
 
     async def preview_department_upload(
         self,
@@ -344,8 +440,7 @@ class MasterTimetableService:
             if any(subject.startswith(prefix) for prefix in prefixes):
                 filtered_entries.append(entry)
 
-        # Check for conflicts with master timetable
-        conflicts = await self._check_department_conflicts(semester_id, filtered_entries)
+        conflicts = await self._check_department_conflicts(semester_id, department_id, filtered_entries)
 
         preview_id = str(uuid.uuid4())
 
@@ -376,7 +471,7 @@ class MasterTimetableService:
         self,
         preview_id: str,
         uploaded_by_id: uuid.UUID
-    ) -> str:
+    ) -> Dict[str, Any]:
         """Persist department entries on their semester's master timetable."""
         preview_data = await self._load_preview(preview_id)
         semester_id = uuid.UUID(preview_data["semester_id"])
@@ -445,9 +540,11 @@ class MasterTimetableService:
                 department_id=department_id,
             ))
 
+        venue_codes = {e.get("venue_code", "") for e in entries}
+
         await self.db.commit()
         await self.redis.delete(f"timetable_preview:{preview_id}")
-        return "Department timetable published successfully"
+        return {"message": "Department timetable published successfully", "venue_codes": venue_codes}
 
     async def export_timetable(
         self,
@@ -528,13 +625,17 @@ class MasterTimetableService:
     async def _check_department_conflicts(
         self,
         semester_id: uuid.UUID,
-        entries: List[Dict]
+        department_id: uuid.UUID,
+        entries: List[Dict],
     ) -> List[Dict]:
-        """Check for venue clashes between department entries and the master timetable.
+        """Check for venue clashes between new department entries and
+        existing *other* department entries.
 
-        A conflict occurs when a department entry occupies the same
-        venue + day + period as an existing master entry with a
-        different subject (i.e. the venue is already booked).
+        Master entries (department_id IS NULL) are excluded because they
+        carry broad department codes (e.g. "DCIT") that would false-
+        positive against specific course codes (e.g. "DCIT111").
+        The uploading department's own existing entries are also excluded
+        since they will be replaced on publish.
         """
         conflicts = []
 
@@ -549,6 +650,8 @@ class MasterTimetableService:
                 .where(
                     and_(
                         MasterTimetable.semester_id == semester_id,
+                        MasterEntry.department_id.isnot(None),
+                        MasterEntry.department_id != department_id,
                         MasterEntry.day == entry["day"],
                         MasterEntry.period == entry["period"],
                         MasterEntry.venue_code == venue,
@@ -568,6 +671,7 @@ class MasterTimetableService:
                     "existing_subject": ex.subject,
                     "new_subject": entry["subject"],
                     "new_level": entry.get("level"),
+                    "existing_department_id": str(ex.department_id),
                 })
 
         return conflicts

@@ -13,6 +13,7 @@ from app.schemas.assessment import (
     AssessmentResponse,
     AssessmentListResponse
 )
+from app.schemas.pagination import PaginationMeta
 from app.services.assessment_service import AssessmentService
 
 router = APIRouter()
@@ -24,19 +25,27 @@ async def list_assessments(
     scope: Optional[str] = Query(None),
     course_id: Optional[uuid.UUID] = Query(None),
     search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(require_permission("assessments.view")),
     db: AsyncSession = Depends(get_db)
 ):
     """List assessments"""
     service = AssessmentService(db)
-    assessments, meta = await service.list_assessments(
+    skip = (page - 1) * page_size
+    assessments, total, counts = await service.list_assessments(
         status=status,
         scope=scope,
         course_id=course_id,
         search=search,
-        user=current_user
+        user=current_user,
+        skip=skip,
+        limit=page_size,
     )
-    return AssessmentListResponse(data=assessments, meta=meta)
+    return AssessmentListResponse(
+        data=assessments,
+        meta=PaginationMeta.build(page, page_size, total, counts=counts),
+    )
 
 
 @router.post("", response_model=AssessmentResponse, status_code=201)

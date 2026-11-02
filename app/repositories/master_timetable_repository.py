@@ -60,16 +60,23 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         level: Optional[int] = None,
         venue_code: Optional[str] = None,
         subjects: Optional[List[str]] = None,
-        day: Optional[int] = None
+        day: Optional[int] = None,
+        source: Optional[str] = None,
+        department_id: Optional[uuid.UUID] = None,
     ) -> List[MasterEntry]:
-        # Semester is stored on MasterTimetable; entries point to their parent
-        # timetable through timetable_id.
         query = (
             select(MasterEntry)
             .join(MasterTimetable, MasterEntry.timetable_id == MasterTimetable.id)
             .where(MasterTimetable.semester_id == semester_id)
         )
 
+        if source == "master":
+            query = query.where(MasterEntry.department_id.is_(None))
+        elif source == "department":
+            query = query.where(MasterEntry.department_id.isnot(None))
+
+        if department_id is not None:
+            query = query.where(MasterEntry.department_id == department_id)
         if level is not None:
             query = query.where(MasterEntry.level == level)
         if venue_code is not None:

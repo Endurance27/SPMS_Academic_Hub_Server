@@ -13,6 +13,7 @@ from app.schemas.faculty import (
     FacultyResponse,
     FacultyUpdate,
 )
+from app.schemas.pagination import PaginationMeta
 from app.services.faculty_service import FacultyService
 
 router = APIRouter()
@@ -45,7 +46,7 @@ async def list_faculty(
 
     return FacultyListResponse(
         data=[FacultyResponse(**f) for f in faculty_list],
-        meta={"page": page, "pageSize": page_size, "total": total},
+        meta=PaginationMeta.build(page, page_size, total),
     )
 
 

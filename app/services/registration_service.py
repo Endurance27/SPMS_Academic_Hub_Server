@@ -24,7 +24,18 @@ class RegistrationService:
         semester_id: Optional[uuid.UUID] = None,
         skip: int = 0,
         limit: int = 50,
-    ) -> tuple[List[dict], dict]:
+    ) -> tuple[List[dict], int, dict]:
+        base = select(CourseRegistration).where(
+            CourseRegistration.student_id == student_id
+        )
+        if semester_id:
+            base = base.where(CourseRegistration.semester_id == semester_id)
+
+        total_result = await self.db.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+        total = total_result.scalar() or 0
+
         query = (
             select(CourseRegistration, Course)
             .outerjoin(Course, Course.id == CourseRegistration.course_id)
@@ -33,7 +44,7 @@ class RegistrationService:
         if semester_id:
             query = query.where(CourseRegistration.semester_id == semester_id)
 
-        query = query.offset(skip).limit(limit).order_by(CourseRegistration.created_at.desc())
+        query = query.order_by(CourseRegistration.created_at.desc()).offset(skip).limit(limit)
         result = await self.db.execute(query)
         rows = result.all()
 
@@ -67,7 +78,7 @@ class RegistrationService:
                 "created_at": reg.created_at,
             })
 
-        return registrations, {"counts": counts, "totalCredits": total_credits}
+        return registrations, total, {"counts": counts, "totalCredits": total_credits}
 
     async def get_catalogue(
         self,

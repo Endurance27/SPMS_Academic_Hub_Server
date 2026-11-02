@@ -34,8 +34,8 @@ class ProgrammeService:
         self,
         department_id: Optional[uuid.UUID] = None,
         skip: int = 0,
-        limit: int = 100
-    ) -> List[Programme]:
+        limit: int = 100,
+    ) -> tuple[list, int]:
         return await self.programme_repo.list_all(department_id, skip, limit)
 
     async def update_programme(
