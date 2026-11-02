@@ -38,21 +38,31 @@ class SecurityService:
                 return pwd
 
     @staticmethod
+    def _email_tag(email: str) -> str:
+        """Extract first 4 alphabetic characters from the email local part, uppercased."""
+        local = email.split("@")[0] if "@" in email else email
+        alpha = "".join(c for c in local if c.isalpha())
+        return alpha[:4].upper() if len(alpha) >= 4 else local[:4].upper()
+
+    @staticmethod
     def generate_role_temp_password(role: str, identifier: Optional[str]) -> str:
-        """Build a recoverable initial password from a user's role identifier."""
+        """Build a recoverable initial password from a user's role and identifier.
+
+        The identifier should be the user's email address for all interactive
+        invitations.  For bulk-imported students it can be the student number.
+        """
         if not identifier or not identifier.strip():
             raise ValueError(f"A {role} identifier is required to generate a temporary password")
 
+        tag = SecurityService._email_tag(identifier)
         normalized_role = role.strip().lower()
-        if normalized_role in {"department", "dp"}:
-            phone_digits = "".join(char for char in identifier if char.isdigit())
-            if len(phone_digits) < 4:
-                raise ValueError("Department phone number must contain at least four digits")
-            return f"SPMS#DP-{phone_digits[-4:]}"
-        if normalized_role in {"staff", "faculty", "lecturer", "sf"}:
-            return f"SPMS#SF-{identifier.strip()}"
+
+        if normalized_role in {"department", "dp", "dt"}:
+            return f"SPMS#DT-{tag}"
+        if normalized_role in {"staff", "faculty", "lecturer", "sf", "lt"}:
+            return f"SPMS#LT-{tag}"
         if normalized_role in {"student", "st"}:
-            return f"SPMS#ST-{identifier.strip()}"
+            return f"SPMS#ST-{tag}"
 
         raise ValueError(f"Unsupported role for temporary password: {role}")
 
