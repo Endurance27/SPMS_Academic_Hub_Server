@@ -1,7 +1,7 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.venue import Venue
@@ -24,10 +24,10 @@ class VenueRepository(BaseRepository[Venue]):
         status: Optional[str] = None,
         search: Optional[str] = None,
         skip: int = 0,
-        limit: int = 100
-    ) -> List[Venue]:
+        limit: int = 100,
+    ) -> Tuple[List[Venue], int]:
         query = select(Venue)
-        
+
         if venue_type:
             query = query.where(Venue.type == venue_type)
         if status:
@@ -38,7 +38,11 @@ class VenueRepository(BaseRepository[Venue]):
                 (Venue.building.ilike(f"%{search}%")) |
                 (Venue.room_number.ilike(f"%{search}%"))
             )
-        
-        query = query.offset(skip).limit(limit)
+
+        total = (await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )).scalar()
+
+        query = query.order_by(Venue.code).offset(skip).limit(limit)
         result = await self.db.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all()), total

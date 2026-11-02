@@ -14,6 +14,7 @@ from app.schemas.venue import (
     VenueResponse,
     VenueListResponse
 )
+from app.schemas.pagination import PaginationMeta
 from app.services.venue_service import VenueService
 
 router = APIRouter()
@@ -31,11 +32,11 @@ async def list_venues(
 ):
     service = VenueService(db)
     skip = (page - 1) * page_size
-    venues = await service.list_venues(venue_type, status, search, skip, page_size)
+    venues, total = await service.list_venues(venue_type, status, search, skip, page_size)
 
     return VenueListResponse(
         data=venues,
-        meta={"page": page, "page_size": page_size}
+        meta=PaginationMeta.build(page, page_size, total),
     )
 
 

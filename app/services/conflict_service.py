@@ -250,6 +250,7 @@ class ConflictService:
                 MasterEntry.timetable_id.in_(tt_ids),
                 MasterEntry.is_free == False,
                 MasterEntry.venue_code.notin_(shared_venues),
+                MasterEntry.department_id.isnot(None),
             ).group_by(
                 MasterEntry.venue_code,
                 MasterEntry.day,

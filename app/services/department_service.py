@@ -27,7 +27,7 @@ class DepartmentService:
         self.email_service = EmailService()
 
     async def create_department(
-        self, data: DepartmentCreate, created_by_id: uuid.UUID, generate_temp_password: bool = False
+        self, data: DepartmentCreate, created_by_id: uuid.UUID, generate_temp_password: bool = True
     ) -> tuple[Department, Optional[str]]:
         """Create a department with its admin account"""
         # Check if code or name already exists
@@ -74,14 +74,10 @@ class DepartmentService:
         self.db.add(settings)
 
         # Create department admin account
-        temp_password = None
-        if generate_temp_password:
-            temp_password = SecurityService.generate_role_temp_password(
-                "department", data.phone
-            )
-            initial_password = temp_password
-        else:
-            initial_password = "ChangeMe123!"  # Will be forced to change
+        temp_password = SecurityService.generate_role_temp_password(
+            "department", data.email
+        )
+        initial_password = temp_password
         hashed_password = SecurityService.get_password_hash(initial_password)
 
         admin_user = User(
@@ -127,8 +123,7 @@ class DepartmentService:
 
     async def list_departments(
         self, search: Optional[str] = None, skip: int = 0, limit: int = 100
-    ) -> List[Department]:
-        """List departments with optional search"""
+    ) -> tuple[list, int]:
         return await self.department_repo.list_with_counts(search, skip, limit)
 
     async def update_department(

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db
 from app.core.permissions import require_permission
 from app.models.user import User, UserRole
+from app.schemas.pagination import PaginationMeta
 from app.schemas.student import (
     CohortListResponse,
     CohortResponse,
@@ -47,7 +48,7 @@ async def list_students(
 
     return StudentListResponse(
         data=[StudentResponse(**s) for s in students],
-        meta={"page": page, "pageSize": page_size, "total": total},
+        meta=PaginationMeta.build(page, page_size, total),
     )
 
 

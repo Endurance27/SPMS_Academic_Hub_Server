@@ -101,13 +101,19 @@ class ReportService:
         department_id: Optional[uuid.UUID] = None,
         skip: int = 0,
         limit: int = 25,
-    ) -> List[ReportJob]:
-        q = select(ReportJob).order_by(ReportJob.created_at.desc())
+    ) -> tuple[list, int]:
+        base = select(ReportJob)
         if department_id:
-            q = q.where(ReportJob.department_id == department_id)
-        q = q.offset(skip).limit(limit)
+            base = base.where(ReportJob.department_id == department_id)
+
+        total_result = await self.db.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+        total = total_result.scalar()
+
+        q = base.order_by(ReportJob.created_at.desc()).offset(skip).limit(limit)
         result = await self.db.execute(q)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
     async def get_report(self, report_id: uuid.UUID) -> Optional[ReportJob]:
         result = await self.db.execute(

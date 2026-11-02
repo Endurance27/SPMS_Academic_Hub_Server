@@ -14,6 +14,8 @@ from app.schemas.department import (
     DepartmentDetailResponse,
     DepartmentListResponse
 )
+from app.schemas.pagination import PaginationMeta
+from app.schemas.pagination import PaginationMeta
 from app.services.department_service import DepartmentService
 
 router = APIRouter()
@@ -48,18 +50,17 @@ async def list_departments(
     service = DepartmentService(db)
     skip = (page - 1) * page_size
 
-    departments = await service.list_departments(search, skip, page_size)
+    departments, total = await service.list_departments(search, skip, page_size)
 
     return DepartmentListResponse(
         data=departments,
-        meta={"page": page, "page_size": page_size}
+        meta=PaginationMeta.build(page, page_size, total),
     )
 
 
 @router.post("", response_model=DepartmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_department(
     data: DepartmentCreate,
-    generate_temp_password: bool = Query(False),
     current_user: User = Depends(require_permission("departments.manage")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -67,19 +68,12 @@ async def create_department(
     service = DepartmentService(db)
 
     try:
-        department, temp_password = await service.create_department(
+        department, _temp_password = await service.create_department(
             data,
             current_user.id,
-            generate_temp_password
         )
 
-        # If temp password was generated, include it in response (only for demo)
-        response_data = DepartmentResponse.model_validate(department)
-        if temp_password:
-            # In production, this would be sent via email
-            response_data.model_dump()
-
-        return response_data
+        return DepartmentResponse.model_validate(department)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

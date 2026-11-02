@@ -77,16 +77,16 @@ class CourseService:
         search: Optional[str] = None,
         skip: int = 0,
         limit: int = 100
-    ) -> tuple[List[Course], dict]:
-        courses = await self.course_repo.list_all(
+    ) -> tuple[list, int, dict]:
+        courses, total = await self.course_repo.list_all(
             department_id, lecturer_id, programme_id, level, search, skip, limit
         )
-        
-        meta = {}
+
+        extra = {}
         if department_id:
-            meta["without_lecturer"] = await self.course_repo.count_without_lecturer(department_id)
-        
-        return courses, meta
+            extra["without_lecturer"] = await self.course_repo.count_without_lecturer(department_id)
+
+        return courses, total, extra
 
     async def update_course(
         self,

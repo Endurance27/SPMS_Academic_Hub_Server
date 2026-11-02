@@ -2,13 +2,14 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_db
 from app.core.permissions import require_permission
 from app.models.role import RoleTemplate
 from app.models.user import User
+from app.schemas.pagination import PaginationMeta
 from app.schemas.role_template import (
     RoleTemplateCreate,
     RoleTemplateListResponse,
@@ -21,18 +22,29 @@ router = APIRouter()
 
 @router.get("", response_model=RoleTemplateListResponse)
 async def list_role_templates(
+    search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
+    sort_by: Optional[str] = Query(None, pattern="^(name|role)$"),
+    order: str = Query("asc", pattern="^(asc|desc)$"),
     current_user: User = Depends(require_permission("roles.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """List all role templates"""
+    query = select(RoleTemplate)
+    if search:
+        query = query.where(RoleTemplate.name.ilike(f"%{search}%"))
+
+    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = count_result.scalar()
+
     skip = (page - 1) * page_size
-    result = await db.execute(select(RoleTemplate).offset(skip).limit(page_size))
+    query = query.order_by(RoleTemplate.name).offset(skip).limit(page_size)
+    result = await db.execute(query)
     templates = list(result.scalars().all())
     return RoleTemplateListResponse(
         data=[RoleTemplateResponse.model_validate(t) for t in templates],
-        meta={"page": page, "page_size": page_size},
+        meta=PaginationMeta.build(page, page_size, total, sort_by, order),
     )
 
 

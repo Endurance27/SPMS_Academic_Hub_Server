@@ -42,5 +42,10 @@ class NotificationResponse(BaseModel):
         from_attributes = True
 
 
+class NotificationListResponse(BaseModel):
+    data: List[NotificationResponse]
+    meta: Optional[dict] = None
+
+
 class NotificationMarkRead(BaseModel):
     notification_ids: List[uuid.UUID]

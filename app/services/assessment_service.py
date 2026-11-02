@@ -21,30 +21,33 @@ class AssessmentService:
         scope: Optional[str],
         course_id: Optional[uuid.UUID],
         search: Optional[str],
-        user: User
-    ) -> tuple[List[Dict], Dict]:
-        """List assessments with scoping"""
-        assessments = await self.repo.list_filtered(
+        user: User,
+        skip: int = 0,
+        limit: int = 25,
+    ) -> tuple[List[Dict], int, Dict]:
+        """List assessments with scoping. Returns (items, total, status_counts)."""
+        assessments, total = await self.repo.list_filtered(
             status=status,
             scope=scope,
             course_id=course_id,
             search=search,
             user_role=user.role,
             user_department_id=user.department_id,
-            user_id=user.id
+            user_id=user.id,
+            skip=skip,
+            limit=limit,
         )
 
         result = [self._assessment_to_dict(a) for a in assessments]
 
-        meta = {
+        counts = {
             "Draft": sum(1 for a in assessments if a.status == AssessmentStatus.DRAFT),
             "Submitted": sum(1 for a in assessments if a.status == AssessmentStatus.SUBMITTED),
             "Upcoming": sum(1 for a in assessments if a.status == AssessmentStatus.UPCOMING),
             "Returned": sum(1 for a in assessments if a.status == AssessmentStatus.RETURNED),
-            "All": len(assessments)
         }
 
-        return result, meta
+        return result, total, counts
 
     async def create_assessment(self, data: Dict, save_as_draft: bool, user: User) -> Dict:
         """Create assessment"""

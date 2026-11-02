@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.core.permissions import require_permission
 from app.models.user import User
+from app.schemas.pagination import PaginationMeta
 from app.schemas.schedule_item import (
     ScheduleItemCreate,
     ScheduleItemUpdate,
@@ -26,21 +27,29 @@ async def list_schedule_items(
     venue_type: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(require_permission("schedule.view")),
     db: AsyncSession = Depends(get_db)
 ):
     """List schedule items"""
     service = ScheduleItemService(db)
-    items, meta = await service.list_items(
+    skip = (page - 1) * page_size
+    items, counts, total = await service.list_items(
         semester_id=semester_id,
         department_id=department_id,
         level=level,
         venue_type=venue_type,
         search=search,
         status=status,
-        user=current_user
+        user=current_user,
+        skip=skip,
+        limit=page_size,
     )
-    return ScheduleItemListResponse(data=items, meta=meta)
+    return ScheduleItemListResponse(
+        data=items,
+        meta=PaginationMeta.build(page, page_size, total, **counts),
+    )
 
 
 @router.post("", response_model=ScheduleItemResponse, status_code=201)

@@ -46,3 +46,4 @@ class SemesterResponse(SemesterBase):
 
 class SemesterListResponse(BaseModel):
     data: list[SemesterResponse]
+    meta: Optional[dict] = None

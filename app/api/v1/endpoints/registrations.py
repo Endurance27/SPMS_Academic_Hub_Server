@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db
 from app.core.permissions import require_permission
 from app.models.user import User
+from app.schemas.pagination import PaginationMeta
 from app.schemas.registration import (
     CatalogueListResponse,
     CatalogueCourseResponse,
@@ -30,7 +31,7 @@ async def list_my_registrations(
     service = RegistrationService(db)
     skip = (page - 1) * page_size
 
-    registrations, extra = await service.list_registrations(
+    registrations, total, extra = await service.list_registrations(
         student_id=current_user.id,
         semester_id=semester_id,
         skip=skip,
@@ -39,12 +40,11 @@ async def list_my_registrations(
 
     return RegistrationListResponse(
         data=[RegistrationResponse(**r) for r in registrations],
-        meta={
-            "page": page,
-            "pageSize": page_size,
-            "counts": extra["counts"],
-            "totalCredits": extra["totalCredits"],
-        },
+        meta=PaginationMeta.build(
+            page, page_size, total,
+            counts=extra["counts"],
+            totalCredits=extra["totalCredits"],
+        ),
     )
 
 

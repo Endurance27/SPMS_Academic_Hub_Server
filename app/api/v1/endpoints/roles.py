@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db
 from app.core.permissions import require_permission
 from app.models.user import User
-from app.schemas.role import PermissionResponse, RoleCreate, RoleResponse, RoleUpdate
+from app.schemas.pagination import PaginationMeta
+from app.schemas.role import PermissionResponse, RoleCreate, RoleListResponse, RoleResponse, RoleUpdate
 from app.services.role_service import RoleService
 
 router = APIRouter(prefix="/roles", tags=["Roles & Permissions"])
@@ -25,7 +26,7 @@ async def create_role(
     return role
 
 
-@router.get("", response_model=List[RoleResponse])
+@router.get("", response_model=RoleListResponse)
 async def list_roles(
     current_user: User = Depends(require_permission("roles.manage")),
     db: AsyncSession = Depends(get_db),
@@ -33,7 +34,11 @@ async def list_roles(
     """List all roles"""
     role_service = RoleService(db)
     roles = await role_service.role_repo.get_all()
-    return roles
+    total = len(roles)
+    return RoleListResponse(
+        data=roles,
+        meta=PaginationMeta.build(1, total or 100, total),
+    )
 
 
 @router.get("/{role_id}", response_model=RoleResponse)

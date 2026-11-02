@@ -13,6 +13,7 @@ from app.schemas.section import (
     SectionResponse,
     SectionUpdate,
 )
+from app.schemas.pagination import PaginationMeta
 from app.services.section_service import SectionService
 
 router = APIRouter()
@@ -31,7 +32,7 @@ async def list_sections(
     service = SectionService(db)
     skip = (page - 1) * page_size
 
-    sections = await service.list_sections(
+    sections, total = await service.list_sections(
         programme_id=programme_id,
         level=level,
         course_id=course_id,
@@ -54,7 +55,7 @@ async def list_sections(
             )
             for s in sections
         ],
-        meta={"page": page, "pageSize": page_size},
+        meta=PaginationMeta.build(page, page_size, total),
     )
 
 

@@ -52,3 +52,8 @@ class RoleResponse(RoleBase):
 
     class Config:
         from_attributes = True
+
+
+class RoleListResponse(BaseModel):
+    data: List[RoleResponse]
+    meta: Optional[dict] = None
