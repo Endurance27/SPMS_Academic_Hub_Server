@@ -1,6 +1,8 @@
+import asyncio
+import logging
 import uuid
 import json
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
 from datetime import datetime
 
 from sqlalchemy import select, and_, or_, delete
@@ -11,10 +13,63 @@ from app.models.master_timetable import MasterTimetable, MasterEntry
 from app.models.timetable_upload import TimetableUpload
 from app.models.semester import Semester
 from app.models.venue import Venue
+from app.models.venue import VenueType, VenueStatus
 from app.models.slot_request import SlotRequest
 from app.models.department import Department
 from app.repositories.master_timetable_repository import MasterTimetableRepository
 from app.utils.timetable_parser import TimetableParser
+
+logger = logging.getLogger(__name__)
+
+SKIP_VENUE_CODES = {"DEPT", "ONLINE", "FREE", "TBA", "TBD", "N/A", ""}
+
+
+async def sync_venues_from_codes(venue_codes: Set[str]) -> None:
+    """Create Venue rows for codes that don't exist yet.
+
+    Runs in its own DB session so it can be called from a background task
+    without depending on the request's session lifecycle.
+    """
+    from app.core.database import AsyncSessionLocal
+
+    codes = {c.upper().strip() for c in venue_codes} - SKIP_VENUE_CODES
+    if not codes:
+        return
+
+    async with AsyncSessionLocal() as db:
+        try:
+            result = await db.execute(
+                select(Venue.code).where(Venue.code.in_(codes))
+            )
+            existing = {row[0] for row in result.all()}
+            new_codes = codes - existing
+
+            if not new_codes:
+                return
+
+            for code in new_codes:
+                import re
+                match = re.match(r"^([A-Za-z]+)(\d+.*)$", code)
+                if match:
+                    building = match.group(1)
+                    room = match.group(2)
+                else:
+                    building = code
+                    room = "-"
+
+                db.add(Venue(
+                    code=code,
+                    building=building,
+                    room_number=room,
+                    type=VenueType.LECTURE_HALL,
+                    status=VenueStatus.AVAILABLE,
+                ))
+
+            await db.commit()
+            logger.info("Auto-created %d venue(s): %s", len(new_codes), ", ".join(sorted(new_codes)))
+        except Exception:
+            await db.rollback()
+            logger.exception("Failed to sync venues from timetable upload")
 
 
 class MasterTimetableService:
@@ -281,7 +336,7 @@ class MasterTimetableService:
         self,
         preview_id: str,
         uploaded_by_id: uuid.UUID
-    ) -> str:
+    ) -> Dict[str, Any]:
         """Persist the uploaded master timetable and its parsed entries."""
         preview_data = await self._load_preview(preview_id)
         semester_id = uuid.UUID(preview_data["semester_id"])
@@ -344,9 +399,13 @@ class MasterTimetableService:
                 kind="master",
             ))
 
+        venue_codes = {
+            e.get("venue_code", "") for entries in entries_by_level.values() for e in entries
+        }
+
         await self.db.commit()
         await self.redis.delete(f"timetable_preview:{preview_id}")
-        return "Timetable published successfully"
+        return {"message": "Timetable published successfully", "venue_codes": venue_codes}
 
     async def preview_department_upload(
         self,
@@ -412,7 +471,7 @@ class MasterTimetableService:
         self,
         preview_id: str,
         uploaded_by_id: uuid.UUID
-    ) -> str:
+    ) -> Dict[str, Any]:
         """Persist department entries on their semester's master timetable."""
         preview_data = await self._load_preview(preview_id)
         semester_id = uuid.UUID(preview_data["semester_id"])
@@ -481,9 +540,11 @@ class MasterTimetableService:
                 department_id=department_id,
             ))
 
+        venue_codes = {e.get("venue_code", "") for e in entries}
+
         await self.db.commit()
         await self.redis.delete(f"timetable_preview:{preview_id}")
-        return "Department timetable published successfully"
+        return {"message": "Department timetable published successfully", "venue_codes": venue_codes}
 
     async def export_timetable(
         self,

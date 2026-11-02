@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File, status
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +17,7 @@ from app.schemas.master_timetable import (
     TimetableEntriesResponse,
 )
 from app.schemas.pagination import PaginationMeta
-from app.services.master_timetable_service import MasterTimetableService
+from app.services.master_timetable_service import MasterTimetableService, sync_venues_from_codes
 
 router = APIRouter()
 
@@ -310,6 +310,7 @@ async def preview_timetable(
 @router.post("/publish", status_code=status.HTTP_200_OK)
 async def publish_timetable(
     data: TimetablePublishRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_permission("timetable.upload")),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
@@ -322,7 +323,9 @@ async def publish_timetable(
         uploaded_by_id=current_user.id
     )
 
-    return {"message": result}
+    background_tasks.add_task(sync_venues_from_codes, result["venue_codes"])
+
+    return {"message": result["message"]}
 
 
 @router.post("/department/preview", response_model=DepartmentTimetablePreviewResponse)
@@ -360,6 +363,7 @@ async def preview_department_timetable(
 @router.post("/department/publish", status_code=status.HTTP_200_OK)
 async def publish_department_timetable(
     data: TimetablePublishRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_permission("timetable.department_upload")),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
@@ -372,7 +376,9 @@ async def publish_department_timetable(
         uploaded_by_id=current_user.id
     )
 
-    return {"message": result}
+    background_tasks.add_task(sync_venues_from_codes, result["venue_codes"])
+
+    return {"message": result["message"]}
 
 
 # ── Entry-level CRUD (sub-path with {entry_id}) ────────────────────
