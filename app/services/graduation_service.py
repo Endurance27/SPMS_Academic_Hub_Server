@@ -101,21 +101,25 @@ class GraduationService:
         status: Optional[str] = None,
         skip: int = 0,
         limit: int = 25,
-    ) -> tuple[List[GraduationSubmission], dict]:
-        query = select(GraduationSubmission)
+    ) -> tuple[List[GraduationSubmission], int, dict]:
+        base_query = select(GraduationSubmission)
 
         if department_id:
-            query = query.where(GraduationSubmission.department_id == department_id)
+            base_query = base_query.where(GraduationSubmission.department_id == department_id)
         if status:
-            query = query.where(GraduationSubmission.status == status)
+            base_query = base_query.where(GraduationSubmission.status == status)
 
-        query = query.offset(skip).limit(limit).order_by(
-            GraduationSubmission.created_at.desc()
+        total_result = await self.db.execute(
+            select(func.count()).select_from(base_query.subquery())
         )
-        result = await self.db.execute(query)
+        total = total_result.scalar() or 0
+
+        data_query = base_query.order_by(
+            GraduationSubmission.created_at.desc()
+        ).offset(skip).limit(limit)
+        result = await self.db.execute(data_query)
         submissions = list(result.scalars().all())
 
-        # Counts
         count_base = select(
             GraduationSubmission.status, func.count(GraduationSubmission.id)
         )
@@ -127,12 +131,11 @@ class GraduationService:
         count_result = await self.db.execute(count_base)
         count_rows = count_result.all()
 
-        counts = {"All": 0, "Submitted": 0, "Validated": 0, "Returned": 0}
+        counts = {"Submitted": 0, "Validated": 0, "Returned": 0}
         for s, c in count_rows:
             counts[s.value] = c
-            counts["All"] += c
 
-        return submissions, counts
+        return submissions, total, counts
 
     async def get_submission(
         self, submission_id: uuid.UUID

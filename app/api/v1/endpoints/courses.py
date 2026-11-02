@@ -2,7 +2,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,6 +16,7 @@ from app.schemas.course import (
     CourseResponse,
     CourseListResponse
 )
+from app.schemas.pagination import PaginationMeta
 from app.services.course_service import CourseService
 
 router = APIRouter()
@@ -82,13 +83,13 @@ async def list_courses(
 
     service = CourseService(db)
     skip = (page - 1) * page_size
-    courses, meta = await service.list_courses(
+    courses, total, extra = await service.list_courses(
         department_id, lecturer_id, programme_id, level, search, skip, page_size
     )
 
     return CourseListResponse(
         data=courses,
-        meta={**meta, "page": page, "page_size": page_size}
+        meta=PaginationMeta.build(page, page_size, total, **extra),
     )
 
 
@@ -185,6 +186,7 @@ async def delete_course(
 @router.get("/{course_id}/students")
 async def get_course_students(
     course_id: UUID,
+    search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(require_permission("courses.view")),
@@ -193,14 +195,23 @@ async def get_course_students(
     """Get enrolled students for a course"""
     await check_course_access(course_id, current_user, db)
 
+    base_conditions = [
+        CourseRegistration.course_id == course_id,
+        CourseRegistration.status == RegistrationStatus.REGISTERED,
+    ]
+
+    count_query = (
+        select(func.count())
+        .select_from(CourseRegistration)
+        .where(*base_conditions)
+    )
+    total = (await db.execute(count_query)).scalar()
+
     skip = (page - 1) * page_size
     query = (
         select(CourseRegistration)
         .options(selectinload(CourseRegistration.student).selectinload(User.programme))
-        .where(
-            CourseRegistration.course_id == course_id,
-            CourseRegistration.status == RegistrationStatus.REGISTERED,
-        )
+        .where(*base_conditions)
         .offset(skip)
         .limit(page_size)
     )
@@ -220,4 +231,4 @@ async def get_course_students(
         if r.student
     ]
 
-    return {"data": students, "meta": {"page": page, "page_size": page_size}}
+    return {"data": students, "meta": PaginationMeta.build(page, page_size, total)}

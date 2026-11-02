@@ -127,8 +127,7 @@ class DepartmentService:
 
     async def list_departments(
         self, search: Optional[str] = None, skip: int = 0, limit: int = 100
-    ) -> List[Department]:
-        """List departments with optional search"""
+    ) -> tuple[list, int]:
         return await self.department_repo.list_with_counts(search, skip, limit)
 
     async def update_department(

@@ -15,6 +15,7 @@ from app.schemas.graduation import (
     GraduationSubmissionDetailResponse,
     GraduationSubmissionResponse,
 )
+from app.schemas.pagination import PaginationMeta
 from app.services.graduation_service import GraduationService
 
 router = APIRouter()
@@ -89,7 +90,7 @@ async def list_submissions(
         dept_id = current_user.department_id
 
     skip = (page - 1) * page_size
-    submissions, counts = await service.list_submissions(
+    submissions, total, counts = await service.list_submissions(
         department_id=dept_id,
         status=status_filter,
         skip=skip,
@@ -98,7 +99,7 @@ async def list_submissions(
 
     return GraduationListResponse(
         data=[GraduationSubmissionResponse.model_validate(s) for s in submissions],
-        meta={"page": page, "pageSize": page_size, "counts": counts},
+        meta=PaginationMeta.build(page, page_size, total, counts=counts),
     )
 
 

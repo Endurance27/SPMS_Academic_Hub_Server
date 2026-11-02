@@ -1,7 +1,7 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.programme import Programme
@@ -22,25 +22,32 @@ class ProgrammeRepository(BaseRepository[Programme]):
         self,
         department_id: uuid.UUID,
         skip: int = 0,
-        limit: int = 100
-    ) -> List[Programme]:
-        result = await self.db.execute(
-            select(Programme)
-            .where(Programme.department_id == department_id)
-            .offset(skip)
-            .limit(limit)
-        )
-        return result.scalars().all()
+        limit: int = 100,
+    ) -> Tuple[List[Programme], int]:
+        query = select(Programme).where(Programme.department_id == department_id)
+
+        total = (await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )).scalar()
+
+        query = query.order_by(Programme.name).offset(skip).limit(limit)
+        result = await self.db.execute(query)
+        return list(result.scalars().all()), total
 
     async def list_all(
         self,
         department_id: Optional[uuid.UUID] = None,
         skip: int = 0,
-        limit: int = 100
-    ) -> List[Programme]:
+        limit: int = 100,
+    ) -> Tuple[List[Programme], int]:
         query = select(Programme)
         if department_id:
             query = query.where(Programme.department_id == department_id)
-        query = query.offset(skip).limit(limit)
+
+        total = (await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )).scalar()
+
+        query = query.order_by(Programme.name).offset(skip).limit(limit)
         result = await self.db.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all()), total

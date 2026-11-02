@@ -9,7 +9,8 @@ from app.core.deps import get_db
 from app.core.permissions import require_permission
 from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
-from app.schemas.user import UserResponse, UserRoleUpdate, UsersListResponse, UserStatusUpdate
+from app.schemas.pagination import PaginationMeta
+from app.schemas.user import UserResponse, UserRoleUpdate, UserStatusUpdate, UsersListResponse
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -60,25 +61,30 @@ async def update_user_role(
 
 @router.get("/audit-logs")
 async def get_audit_logs(
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(require_permission("audit.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    from sqlalchemy import select
+    from sqlalchemy import func, select
 
     from app.models.audit import AuditLog
 
+    total = (await db.execute(select(func.count()).select_from(AuditLog))).scalar()
+    skip = (page - 1) * page_size
     result = await db.execute(
-        select(AuditLog).order_by(AuditLog.created_at.desc()).offset(skip).limit(limit)
+        select(AuditLog).order_by(AuditLog.created_at.desc()).offset(skip).limit(page_size)
     )
-    return result.scalars().all()
+    return {
+        "data": list(result.scalars().all()),
+        "meta": PaginationMeta.build(page, page_size, total),
+    }
 
 
 @router.get("/users", response_model=UsersListResponse)
 async def get_all_users(
-    per_page: int = 20,
-    page: int = 1,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
     name: Optional[str] = Query(None, description="Filter users by name"),
     role: Optional[UserRole] = Query(None, description="Filter users by role"),
     is_active: Optional[bool] = Query(None, description="Filter users by active status"),
@@ -88,11 +94,6 @@ async def get_all_users(
     current_user: User = Depends(require_permission("users.manage")),
     db: AsyncSession = Depends(get_db),
 ):
-    if page < 1:
-        page = 1
-    if per_page < 1:
-        per_page = 20
-
     skip = (page - 1) * per_page
     filters = {}
     if role is not None:
@@ -112,18 +113,10 @@ async def get_all_users(
     items = await user_repo.get_all(skip, per_page, filters=filters or None)
     total_users = await user_repo.count(filters=filters or None)
 
-    total_pages = (total_users + per_page - 1) // per_page if per_page else 0
-    return {
-        "items": items,
-        "pagination": {
-            "total": total_users,
-            "page": page,
-            "per_page": per_page,
-            "total_pages": total_pages,
-            "has_next": page < total_pages,
-            "has_prev": page > 1 and total_pages > 0,
-        },
-    }
+    return UsersListResponse(
+        data=items,
+        meta=PaginationMeta.build(page, per_page, total_users),
+    )
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)

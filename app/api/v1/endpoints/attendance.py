@@ -15,6 +15,7 @@ from app.schemas.attendance import (
     AttendanceRecordResponse,
     AttendanceSessionListResponse
 )
+from app.schemas.pagination import PaginationMeta
 from app.services.attendance_service import AttendanceService
 
 router = APIRouter()
@@ -26,19 +27,27 @@ async def list_sessions(
     course_id: Optional[uuid.UUID] = Query(None),
     department_id: Optional[uuid.UUID] = Query(None),
     date: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(require_permission("attendance.view")),
     db: AsyncSession = Depends(get_db)
 ):
     """List attendance sessions"""
     service = AttendanceService(db)
-    sessions, meta = await service.list_sessions(
+    skip = (page - 1) * page_size
+    sessions, total, counts = await service.list_sessions(
         status=status,
         course_id=course_id,
         department_id=department_id,
         date=date,
-        user=current_user
+        user=current_user,
+        skip=skip,
+        limit=page_size,
     )
-    return AttendanceSessionListResponse(data=sessions, meta=meta)
+    return AttendanceSessionListResponse(
+        data=sessions,
+        meta=PaginationMeta.build(page, page_size, total, counts=counts),
+    )
 
 
 @router.post("/sessions", response_model=AttendanceSessionResponse, status_code=201)
@@ -125,12 +134,22 @@ async def list_records(
     student_id: Optional[uuid.UUID] = Query(None),
     from_date: Optional[str] = Query(None),
     to_date: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(require_permission("attendance.view")),
     db: AsyncSession = Depends(get_db)
 ):
     """List attendance records"""
     service = AttendanceService(db)
-    return await service.list_records(course_id, student_id, from_date, to_date, current_user)
+    skip = (page - 1) * page_size
+    records, total, stats = await service.list_records(
+        course_id, student_id, from_date, to_date, current_user,
+        skip=skip, limit=page_size,
+    )
+    return {
+        "data": records,
+        "meta": PaginationMeta.build(page, page_size, total, stats=stats),
+    }
 
 
 @router.patch("/records/{record_id}")

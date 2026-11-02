@@ -23,8 +23,9 @@ class SemesterService:
     async def get_semester(self, semester_id: uuid.UUID) -> Semester:
         return await self.semester_repo.get_by_id(semester_id)
 
-    async def list_semesters(self) -> list[Semester]:
-        return await self.semester_repo.list_all()
+    async def list_semesters(self) -> tuple[list, int]:
+        items = await self.semester_repo.list_all()
+        return items, len(items)
 
     async def update_semester(self, semester_id: uuid.UUID, data: SemesterUpdate) -> Semester:
         semester = await self.semester_repo.get_by_id(semester_id)

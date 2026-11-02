@@ -3,7 +3,7 @@ import io
 import uuid
 from typing import List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -271,19 +271,22 @@ class ImportService:
         department_id: Optional[uuid.UUID] = None,
         skip: int = 0,
         limit: int = 25,
-    ) -> List[StudentImport]:
-        query = select(StudentImport)
+    ) -> tuple[list, int]:
+        base = select(StudentImport)
 
         if kind:
-            query = query.where(StudentImport.kind == kind)
+            base = base.where(StudentImport.kind == kind)
         if department_id:
-            query = query.where(StudentImport.department_id == department_id)
+            base = base.where(StudentImport.department_id == department_id)
 
-        query = query.offset(skip).limit(limit).order_by(
-            StudentImport.created_at.desc()
+        total_result = await self.db.execute(
+            select(func.count()).select_from(base.subquery())
         )
+        total = total_result.scalar()
+
+        query = base.order_by(StudentImport.created_at.desc()).offset(skip).limit(limit)
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
     async def get_import(self, import_id: uuid.UUID) -> Optional[StudentImport]:
         result = await self.db.execute(
@@ -296,7 +299,14 @@ class ImportService:
         import_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[StudentImportRow]:
+    ) -> tuple[list, int]:
+        total_result = await self.db.execute(
+            select(func.count()).select_from(StudentImportRow).where(
+                StudentImportRow.import_id == import_id
+            )
+        )
+        total = total_result.scalar()
+
         result = await self.db.execute(
             select(StudentImportRow)
             .where(StudentImportRow.import_id == import_id)
@@ -304,4 +314,4 @@ class ImportService:
             .offset(skip)
             .limit(limit)
         )
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total

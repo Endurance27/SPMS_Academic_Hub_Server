@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db
 from app.core.permissions import require_permission
 from app.models.user import User
+from app.schemas.pagination import PaginationMeta
 from app.schemas.staff import StaffCreate, StaffListResponse, StaffResponse, StaffUpdate
 from app.services.staff_service import StaffService
 
@@ -26,7 +27,7 @@ async def list_staff(
     service = StaffService(db)
     skip = (page - 1) * page_size
 
-    staff_list, counts = await service.list_staff(
+    staff_list, total, counts = await service.list_staff(
         role=role,
         status=status_filter,
         search=search,
@@ -36,7 +37,7 @@ async def list_staff(
 
     return StaffListResponse(
         data=[StaffResponse(**s) for s in staff_list],
-        meta={"page": page, "pageSize": page_size, "counts": counts},
+        meta=PaginationMeta.build(page, page_size, total, counts=counts),
     )
 
 

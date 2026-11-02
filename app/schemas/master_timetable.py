@@ -25,6 +25,7 @@ class DepartmentTimetablePreviewResponse(BaseModel):
 
 class TimetableListResponse(BaseModel):
     data: List[Dict[str, Any]]
+    meta: Optional[Dict[str, Any]] = None
 
 
 class TimetableEntriesResponse(BaseModel):

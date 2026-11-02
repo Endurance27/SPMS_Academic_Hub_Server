@@ -24,31 +24,34 @@ class AttendanceService:
         course_id: Optional[uuid.UUID],
         department_id: Optional[uuid.UUID],
         date: Optional[str],
-        user: User
-    ) -> tuple[List[Dict], Dict]:
-        """List attendance sessions"""
-        sessions = await self.repo.list_sessions_filtered(
+        user: User,
+        skip: int = 0,
+        limit: int = 25,
+    ) -> tuple[List[Dict], int, Dict]:
+        """List attendance sessions. Returns (items, total, status_counts)."""
+        sessions, total = await self.repo.list_sessions_filtered(
             status=status,
             course_id=course_id,
             department_id=department_id,
             date=date,
             user_role=user.role,
             user_department_id=user.department_id,
-            user_id=user.id
+            user_id=user.id,
+            skip=skip,
+            limit=limit,
         )
 
         result = []
         for session in sessions:
             result.append(await self._session_to_dict(session))
 
-        meta = {
-            "All": len(sessions),
+        counts = {
             "Live": sum(1 for s in sessions if s.status == AttendanceStatus.LIVE),
             "Completed": sum(1 for s in sessions if s.status == AttendanceStatus.COMPLETED),
-            "Missed": sum(1 for s in sessions if s.status == AttendanceStatus.MISSED)
+            "Missed": sum(1 for s in sessions if s.status == AttendanceStatus.MISSED),
         }
 
-        return result, meta
+        return result, total, counts
 
     async def create_session(self, data: Dict, user: User) -> Dict:
         """Create attendance session"""
@@ -259,16 +262,20 @@ class AttendanceService:
         student_id: Optional[uuid.UUID],
         from_date: Optional[str],
         to_date: Optional[str],
-        user: User
-    ) -> Dict:
-        """List attendance records"""
-        records = await self.repo.list_records_filtered(
+        user: User,
+        skip: int = 0,
+        limit: int = 25,
+    ) -> tuple[list, int, Dict]:
+        """List attendance records. Returns (items, total, stats)."""
+        records, total = await self.repo.list_records_filtered(
             course_id=course_id,
             student_id=student_id,
             from_date=from_date,
             to_date=to_date,
             user_role=user.role,
-            user_id=user.id
+            user_id=user.id,
+            skip=skip,
+            limit=limit,
         )
 
         stats = {
@@ -283,7 +290,7 @@ class AttendanceService:
         if stats["sessions"] > 0:
             stats["rate"] = (stats["present"] + stats["late"]) / len(records) if records else 0.0
 
-        return {"records": records, "stats": stats}
+        return records, total, stats
 
     async def _session_to_dict(self, session: AttendanceSession) -> Dict:
         """Convert session to dict"""

@@ -11,6 +11,7 @@ from app.models.course import Course
 from app.models.registration import CourseRegistration, RegistrationStatus
 from app.models.schedule_item import ScheduleItem
 from app.models.user import User, UserRole
+from app.schemas.pagination import PaginationMeta
 
 router = APIRouter()
 
@@ -18,6 +19,9 @@ router = APIRouter()
 @router.get("/lecturer/courses")
 async def get_lecturer_courses(
     semester_id: Optional[UUID] = Query(None),
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -33,6 +37,19 @@ async def get_lecturer_courses(
         .options(selectinload(Course.department))
         .where(Course.lecturer_id == current_user.id)
     )
+    if search:
+        query = query.where(
+            Course.code.ilike(f"%{search}%") | Course.title.ilike(f"%{search}%")
+        )
+
+    count_result = await db.execute(
+        select(func.count()).select_from(query.subquery())
+    )
+    total = count_result.scalar_one()
+
+    query = query.order_by(Course.code)
+    skip = (page - 1) * page_size
+    query = query.offset(skip).limit(page_size)
     result = await db.execute(query)
     courses = list(result.scalars().all())
 
@@ -71,12 +88,18 @@ async def get_lecturer_courses(
             }
         )
 
-    return {"data": course_data}
+    return {
+        "data": course_data,
+        "meta": PaginationMeta.build(page, page_size, total),
+    }
 
 
 @router.get("/lecturer/students")
 async def get_lecturer_students(
     course_id: UUID = Query(...),
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -98,7 +121,7 @@ async def get_lecturer_students(
             detail="You are not assigned to this course",
         )
 
-    result = await db.execute(
+    base_query = (
         select(CourseRegistration)
         .options(selectinload(CourseRegistration.student).selectinload(User.programme))
         .where(
@@ -106,6 +129,20 @@ async def get_lecturer_students(
             CourseRegistration.status == RegistrationStatus.REGISTERED,
         )
     )
+    if search:
+        base_query = base_query.join(CourseRegistration.student).where(
+            User.name.ilike(f"%{search}%")
+            | User.email.ilike(f"%{search}%")
+            | User.student_number.ilike(f"%{search}%")
+        )
+
+    count_result = await db.execute(
+        select(func.count()).select_from(base_query.subquery())
+    )
+    total = count_result.scalar_one()
+
+    skip = (page - 1) * page_size
+    result = await db.execute(base_query.offset(skip).limit(page_size))
     registrations = list(result.scalars().all())
 
     students = [
@@ -123,9 +160,9 @@ async def get_lecturer_students(
 
     return {
         "data": students,
-        "meta": {
-            "course_code": course.code,
-            "course_title": course.title,
-            "total": len(students),
-        },
+        "meta": PaginationMeta.build(
+            page, page_size, total,
+            course_code=course.code,
+            course_title=course.title,
+        ),
     }

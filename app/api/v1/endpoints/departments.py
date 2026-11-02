@@ -14,6 +14,8 @@ from app.schemas.department import (
     DepartmentDetailResponse,
     DepartmentListResponse
 )
+from app.schemas.pagination import PaginationMeta
+from app.schemas.pagination import PaginationMeta
 from app.services.department_service import DepartmentService
 
 router = APIRouter()
@@ -48,11 +50,11 @@ async def list_departments(
     service = DepartmentService(db)
     skip = (page - 1) * page_size
 
-    departments = await service.list_departments(search, skip, page_size)
+    departments, total = await service.list_departments(search, skip, page_size)
 
     return DepartmentListResponse(
         data=departments,
-        meta={"page": page, "page_size": page_size}
+        meta=PaginationMeta.build(page, page_size, total),
     )
 
 

@@ -21,8 +21,10 @@ class AttendanceRepository(BaseRepository[AttendanceSession]):
         date: Optional[str],
         user_role: UserRole,
         user_department_id: Optional[uuid.UUID],
-        user_id: uuid.UUID
-    ) -> List[AttendanceSession]:
+        user_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 25,
+    ) -> tuple[List[AttendanceSession], int]:
         query = select(AttendanceSession)
 
         if status:
@@ -38,17 +40,28 @@ class AttendanceRepository(BaseRepository[AttendanceSession]):
         if date:
             query = query.where(AttendanceSession.date == date)
 
-        # Scoping
         if user_role == UserRole.LECTURER:
             query = query.where(AttendanceSession.lecturer_id == user_id)
         elif user_role == UserRole.DEPARTMENT:
-            # Filter by department courses
-            pass
+            if user_department_id:
+                from app.models.course import Course
+                query = query.where(
+                    AttendanceSession.course_id.in_(
+                        select(Course.id).where(Course.department_id == user_department_id)
+                    )
+                )
 
-        query = query.order_by(AttendanceSession.date.desc(), AttendanceSession.start_time)
+        count_result = await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )
+        total = count_result.scalar() or 0
+
+        query = query.order_by(
+            AttendanceSession.date.desc(), AttendanceSession.start_time
+        ).offset(skip).limit(limit)
 
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
     async def get_session_by_id(self, session_id: uuid.UUID) -> Optional[AttendanceSession]:
         result = await self.db.execute(
@@ -104,8 +117,10 @@ class AttendanceRepository(BaseRepository[AttendanceSession]):
         from_date: Optional[str],
         to_date: Optional[str],
         user_role: UserRole,
-        user_id: uuid.UUID
-    ) -> List[AttendanceRecord]:
+        user_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 25,
+    ) -> tuple[List[AttendanceRecord], int]:
         query = select(AttendanceRecord)
 
         if course_id:
@@ -120,14 +135,22 @@ class AttendanceRepository(BaseRepository[AttendanceSession]):
         if to_date:
             query = query.where(AttendanceRecord.recorded_at <= to_date)
 
-        # Scoping
         if user_role == UserRole.LECTURER:
-            # Filter by lecturer's courses
-            pass
+            from app.models.course import Course
+            query = query.where(
+                AttendanceRecord.course_id.in_(
+                    select(Course.id).where(Course.lecturer_id == user_id)
+                )
+            )
         elif user_role == UserRole.STUDENT:
             query = query.where(AttendanceRecord.student_id == user_id)
 
-        query = query.order_by(AttendanceRecord.recorded_at.desc())
+        count_result = await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )
+        total = count_result.scalar() or 0
+
+        query = query.order_by(AttendanceRecord.recorded_at.desc()).offset(skip).limit(limit)
 
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total

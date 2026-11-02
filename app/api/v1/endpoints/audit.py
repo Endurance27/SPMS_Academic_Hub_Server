@@ -10,6 +10,7 @@ from app.core.deps import get_db
 from app.core.permissions import require_permission
 from app.models.user import User
 from app.schemas.audit import AuditLogListResponse, AuditLogResponse
+from app.schemas.pagination import PaginationMeta
 from app.services.audit_service import AuditService
 
 router = APIRouter()
@@ -45,12 +46,7 @@ async def list_audit_logs(
 
     return AuditLogListResponse(
         data=[AuditLogResponse.model_validate(log) for log in logs],
-        meta={
-            "page": page,
-            "pageSize": page_size,
-            "total": total,
-            "counts": counts,
-        },
+        meta=PaginationMeta.build(page, page_size, total, counts=counts),
     )
 
 

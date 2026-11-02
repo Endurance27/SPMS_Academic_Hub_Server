@@ -26,10 +26,12 @@ class ScheduleItemService:
         venue_type: Optional[str],
         search: Optional[str],
         status: Optional[str],
-        user: User
-    ) -> tuple[List[Dict], Dict]:
+        user: User,
+        skip: int = 0,
+        limit: int = 25,
+    ) -> tuple[List[Dict], Dict, int]:
         """List schedule items with scoping"""
-        items = await self.repo.list_filtered(
+        items, total = await self.repo.list_filtered(
             semester_id=semester_id,
             department_id=department_id,
             level=level,
@@ -37,14 +39,15 @@ class ScheduleItemService:
             search=search,
             status=status,
             user_role=user.role,
-            user_department_id=user.department_id
+            user_department_id=user.department_id,
+            skip=skip,
+            limit=limit,
         )
 
         result = []
         for item in items:
             result.append(await self._item_to_dict(item))
 
-        # Meta counts
         meta = {
             "pending": sum(1 for i in items if i.status == ScheduleItemStatus.PENDING),
             "conflict": sum(1 for i in items if i.status == ScheduleItemStatus.CONFLICT),
@@ -52,7 +55,7 @@ class ScheduleItemService:
             "venue_utilisation": await self._calculate_venue_utilisation(semester_id)
         }
 
-        return result, meta
+        return result, meta, total
 
     async def create_item(self, data: Dict, user: User) -> Dict:
         """Create manual schedule item"""

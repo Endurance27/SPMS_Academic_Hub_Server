@@ -22,8 +22,13 @@ class ScheduleItemRepository(BaseRepository[ScheduleItem]):
         search: Optional[str],
         status: Optional[str],
         user_role: UserRole,
-        user_department_id: Optional[uuid.UUID]
-    ) -> List[ScheduleItem]:
+        user_department_id: Optional[uuid.UUID],
+        skip: int = 0,
+        limit: int = 25,
+    ) -> tuple[list[ScheduleItem], int]:
+        from sqlalchemy.orm import selectinload
+        from app.models.course import Course
+
         query = select(ScheduleItem).where(ScheduleItem.semester_id == semester_id)
 
         if status:
@@ -36,18 +41,27 @@ class ScheduleItemRepository(BaseRepository[ScheduleItem]):
         if department_id:
             query = query.where(ScheduleItem.department_id == department_id)
 
-        # Scoping
+        if level:
+            query = query.where(ScheduleItem.level == level)
+
         if user_role == UserRole.DEPARTMENT:
             query = query.where(ScheduleItem.department_id == user_department_id)
 
         if search:
-            # Would need to join with courses for search
-            pass
+            query = query.join(Course, ScheduleItem.course_id == Course.id).where(
+                Course.code.ilike(f"%{search}%") | Course.title.ilike(f"%{search}%")
+            )
+
+        count_result = await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )
+        total = count_result.scalar_one()
 
         query = query.order_by(ScheduleItem.day, ScheduleItem.start_period)
+        query = query.offset(skip).limit(limit)
 
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
     async def count_by_status(
         self,
