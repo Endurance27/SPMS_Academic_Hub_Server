@@ -19,6 +19,10 @@ from app.services.programme_service import ProgrammeService
 router = APIRouter()
 
 
+def _user_dept_in_programme(user: User, programme) -> bool:
+    return any(d.id == user.department_id for d in programme.departments)
+
+
 @router.get("", response_model=ProgrammeListResponse)
 async def list_programmes(
     department_id: Optional[UUID] = Query(None),
@@ -47,8 +51,8 @@ async def create_programme(
     db: AsyncSession = Depends(get_db)
 ):
     if current_user.role == UserRole.DEPARTMENT:
-        if data.department_id != current_user.department_id:
-            raise HTTPException(status_code=403, detail="Can only create programmes for own department")
+        if current_user.department_id not in data.department_ids:
+            raise HTTPException(status_code=403, detail="Department-role users must include their own department")
 
     service = ProgrammeService(db)
     try:
@@ -70,7 +74,7 @@ async def get_programme(
         raise HTTPException(status_code=404, detail="Programme not found")
 
     if current_user.role == UserRole.DEPARTMENT:
-        if programme.department_id != current_user.department_id:
+        if not _user_dept_in_programme(current_user, programme):
             raise HTTPException(status_code=403, detail="Access denied")
 
     return programme
@@ -90,7 +94,7 @@ async def update_programme(
         raise HTTPException(status_code=404, detail="Programme not found")
 
     if current_user.role == UserRole.DEPARTMENT:
-        if programme.department_id != current_user.department_id:
+        if not _user_dept_in_programme(current_user, programme):
             raise HTTPException(status_code=403, detail="Access denied")
 
     try:
@@ -113,7 +117,7 @@ async def delete_programme(
         raise HTTPException(status_code=404, detail="Programme not found")
 
     if current_user.role == UserRole.DEPARTMENT:
-        if programme.department_id != current_user.department_id:
+        if not _user_dept_in_programme(current_user, programme):
             raise HTTPException(status_code=403, detail="Access denied")
 
     try:

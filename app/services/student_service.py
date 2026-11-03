@@ -106,9 +106,10 @@ class StudentService:
         )
 
         if department_id:
+            from app.models.programme import programme_departments
             query = query.where(
                 User.programme_id.in_(
-                    select(Programme.id).where(Programme.department_id == department_id)
+                    select(programme_departments.c.programme_id).where(programme_departments.c.department_id == department_id)
                 )
             )
         if programme_id:
@@ -167,7 +168,12 @@ class StudentService:
         )
 
         if department_id:
-            query = query.where(Programme.department_id == department_id)
+            from app.models.programme import programme_departments
+            query = query.where(
+                Programme.id.in_(
+                    select(programme_departments.c.programme_id).where(programme_departments.c.department_id == department_id)
+                )
+            )
 
         result = await self.db.execute(query)
         rows = result.all()

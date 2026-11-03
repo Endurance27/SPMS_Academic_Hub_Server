@@ -187,13 +187,21 @@ async def register(
         )
 
     from app.models.programme import Programme
+    from sqlalchemy.orm import selectinload
 
-    result = await db.execute(select(Programme).where(Programme.id == data.programme_id))
+    result = await db.execute(
+        select(Programme).options(selectinload(Programme.departments)).where(Programme.id == data.programme_id)
+    )
     programme = result.scalar_one_or_none()
     if not programme:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid programme.",
+        )
+    if not programme.departments:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Programme has no departments assigned.",
         )
 
     user = User(
@@ -203,7 +211,7 @@ async def register(
         role=UserRole.STUDENT,
         status=UserStatus.ACTIVE,
         programme_id=data.programme_id,
-        department_id=programme.department_id,
+        department_id=programme.departments[0].id,
         level=data.level,
         student_number=data.student_number,
         student_category="Undergraduate" if data.level <= 400 else "Postgraduate",
