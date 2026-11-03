@@ -48,13 +48,31 @@ class CourseRegistration(Base):
     semester = relationship("Semester")
 
 
+class ImportKind(str, enum.Enum):
+    STUDENT_ONBOARDING = "STUDENT_ONBOARDING"
+    COURSE_ROSTER = "COURSE_ROSTER"
+
+
+class ImportStatus(str, enum.Enum):
+    QUEUED = "QUEUED"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class ImportRowOutcome(str, enum.Enum):
+    CREATED = "CREATED"
+    UPDATED = "UPDATED"
+    SKIPPED = "SKIPPED"
+
+
 class StudentImport(Base):
     __tablename__ = "student_imports"
 
     id = Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False
     )
-    kind = Column(String(50), nullable=False)  # "student-onboarding" or "course-roster"
+    kind = Column(Enum(ImportKind), nullable=False)
     department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"), nullable=False)
     course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id"))
     programme_id = Column(UUID(as_uuid=True), ForeignKey("programmes.id"))
@@ -70,7 +88,7 @@ class StudentImport(Base):
     updated_count = Column(Integer, default=0)
     warning_count = Column(Integer, default=0)
     error_count = Column(Integer, default=0)
-    status = Column(String(50), default="Queued")
+    status = Column(Enum(ImportStatus), default=ImportStatus.QUEUED)
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -94,10 +112,8 @@ class StudentImportRow(Base):
     import_id = Column(UUID(as_uuid=True), ForeignKey("student_imports.id", ondelete="CASCADE"), nullable=False)
     row_number = Column(Integer, nullable=False)
     raw = Column(JSON)
-    outcome = Column(String(50))  # "created", "updated", "skipped"
+    outcome = Column(Enum(ImportRowOutcome))
     message = Column(String(500))
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     import_obj = relationship("StudentImport", back_populates="rows")

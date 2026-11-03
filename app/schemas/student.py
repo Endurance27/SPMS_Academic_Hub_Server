@@ -2,9 +2,18 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from app.models.user import StudentCategory, UserStatus
+
+
+class StudentCreate(BaseModel):
+    name: str
+    email: EmailStr
+    student_number: Optional[str] = None
+    programme_id: Optional[uuid.UUID] = None
+    level: Optional[int] = None
+    student_category: Optional[StudentCategory] = None
 
 
 class StudentResponse(BaseModel):

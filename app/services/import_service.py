@@ -1,26 +1,36 @@
 import csv
+import hashlib
 import io
+import secrets
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+from loguru import logger
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.security import SecurityService
+from app.models.invitation import Invitation
 from app.models.registration import (
     CourseRegistration,
+    ImportKind,
+    ImportRowOutcome,
+    ImportStatus,
     RegistrationStatus,
     RegistrationType,
     StudentImport,
     StudentImportRow,
 )
 from app.models.user import User, UserRole, UserStatus
+from app.services.email_service import EmailService
 
 
 class ImportService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.email_service = EmailService()
 
     async def create_student_import(
         self,
@@ -49,14 +59,14 @@ class ImportService:
         header_map = {h.lower().strip(): h for h in (reader.fieldnames or [])}
 
         import_obj = StudentImport(
-            kind="student-onboarding",
+            kind=ImportKind.STUDENT_ONBOARDING,
             department_id=department_id,
             programme_id=programme_id,
             student_category=student_category,
             academic_year=academic_year,
             filename=filename,
             row_count=len(rows_raw),
-            status="Processing",
+            status=ImportStatus.PROCESSING,
             created_by_id=created_by_id,
         )
         self.db.add(import_obj)
@@ -66,6 +76,7 @@ class ImportService:
         updated_count = 0
         warning_count = 0
         error_count = 0
+        pending_emails: list[tuple[str, str, str, str]] = []
 
         for i, row in enumerate(rows_raw, start=1):
             student_number = row.get(header_map.get("student id", ""), "").strip()
@@ -77,7 +88,7 @@ class ImportService:
             message = None
 
             if not email or not name:
-                outcome = "skipped"
+                outcome = ImportRowOutcome.SKIPPED
                 message = "Missing required field (name or email)"
                 error_count += 1
             else:
@@ -95,7 +106,7 @@ class ImportService:
                         existing_user.programme_id = programme_id
                     if level and not existing_user.level:
                         existing_user.level = level
-                    outcome = "updated"
+                    outcome = ImportRowOutcome.UPDATED
                     updated_count += 1
                 else:
                     temporary_password = SecurityService.generate_role_temp_password(
@@ -115,7 +126,19 @@ class ImportService:
                         title=f"Level {level} Student" if level else "Student",
                     )
                     self.db.add(new_user)
-                    outcome = "created"
+                    await self.db.flush()
+
+                    raw_token = secrets.token_urlsafe(48)
+                    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+                    invitation = Invitation(
+                        user_id=new_user.id,
+                        token_hash=token_hash,
+                        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+                    )
+                    self.db.add(invitation)
+
+                    pending_emails.append((email, name, raw_token, temporary_password))
+                    outcome = ImportRowOutcome.CREATED
                     created_count += 1
 
             import_row = StudentImportRow(
@@ -131,10 +154,23 @@ class ImportService:
         import_obj.updated_count = updated_count
         import_obj.warning_count = warning_count
         import_obj.error_count = error_count
-        import_obj.status = "Completed"
+        import_obj.status = ImportStatus.COMPLETED
 
         await self.db.commit()
         await self.db.refresh(import_obj)
+
+        for to_email, user_name, raw_token, temp_pw in pending_emails:
+            try:
+                await self.email_service.send_invitation_email(
+                    to_email=to_email,
+                    user_name=user_name,
+                    role="student",
+                    invitation_token=raw_token,
+                    temporary_password=temp_pw,
+                )
+            except Exception:
+                logger.exception("Failed to send invitation email to {}", to_email)
+
         return import_obj
 
     async def create_course_roster_import(
@@ -164,7 +200,7 @@ class ImportService:
         header_map = {h.lower().strip(): h for h in (reader.fieldnames or [])}
 
         import_obj = StudentImport(
-            kind="course-roster",
+            kind=ImportKind.COURSE_ROSTER,
             department_id=department_id,
             course_id=course_id,
             student_category=student_category,
@@ -172,7 +208,7 @@ class ImportService:
             semester_id=semester_id,
             filename=filename,
             row_count=len(rows_raw),
-            status="Processing",
+            status=ImportStatus.PROCESSING,
             created_by_id=created_by_id,
         )
         self.db.add(import_obj)
@@ -192,7 +228,7 @@ class ImportService:
             message = None
 
             if not email or not name:
-                outcome = "skipped"
+                outcome = ImportRowOutcome.SKIPPED
                 message = "Missing required field (name or email)"
                 error_count += 1
             else:
@@ -220,10 +256,10 @@ class ImportService:
                     )
                     self.db.add(student)
                     await self.db.flush()
-                    outcome = "created"
+                    outcome = ImportRowOutcome.CREATED
                     created_count += 1
                 else:
-                    outcome = "updated"
+                    outcome = ImportRowOutcome.UPDATED
                     updated_count += 1
 
                 # Create course registration
@@ -259,7 +295,7 @@ class ImportService:
         import_obj.created_count = created_count
         import_obj.updated_count = updated_count
         import_obj.error_count = error_count
-        import_obj.status = "Completed"
+        import_obj.status = ImportStatus.COMPLETED
 
         await self.db.commit()
         await self.db.refresh(import_obj)

@@ -30,13 +30,15 @@ async def import_students(
     academic_year: str = Form(...),
     programme_id: Optional[UUID] = Form(None),
     level: Optional[int] = Form(None),
+    department_id: Optional[UUID] = Form(None),
     current_user: User = Depends(require_permission("imports.manage")),
     db: AsyncSession = Depends(get_db),
 ):
-    if not current_user.department_id:
+    dept_id = current_user.department_id or department_id
+    if not dept_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Department context required.",
+            detail="Department context required. Super admins must provide department_id.",
         )
 
     if not file.filename or not file.filename.endswith(".csv"):
@@ -52,7 +54,7 @@ async def import_students(
         import_obj = await service.create_student_import(
             file_content=content,
             filename=file.filename,
-            department_id=current_user.department_id,
+            department_id=dept_id,
             student_category=student_category,
             academic_year=academic_year,
             programme_id=programme_id,
@@ -77,14 +79,15 @@ async def import_course_roster(
     student_category: str = Form(...),
     academic_year: str = Form(...),
     semester_id: UUID = Form(...),
+    department_id: Optional[UUID] = Form(None),
     current_user: User = Depends(require_permission("imports.manage")),
     db: AsyncSession = Depends(get_db),
 ):
-    dept_id = current_user.department_id
+    dept_id = current_user.department_id or department_id
     if not dept_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Department context required.",
+            detail="Department context required. Super admins must provide department_id.",
         )
 
     if not file.filename or not file.filename.endswith(".csv"):
