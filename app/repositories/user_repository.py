@@ -109,9 +109,20 @@ class UserRepository(BaseRepository[User]):
         return result.scalar_one_or_none()
 
     async def get_by_department(self, department_id: uuid.UUID, skip: int = 0, limit: int = 100) -> list[User]:
+        from app.models.programme import programme_departments
         result = await self.db.execute(
             select(User)
-            .where(User.department_id == department_id)
+            .where(
+                (User.department_id == department_id)
+                | (
+                    (User.role == UserRole.STUDENT)
+                    & User.programme_id.in_(
+                        select(programme_departments.c.programme_id).where(
+                            programme_departments.c.department_id == department_id
+                        )
+                    )
+                )
+            )
             .offset(skip)
             .limit(limit)
         )
@@ -127,8 +138,21 @@ class UserRepository(BaseRepository[User]):
         return list(result.scalars().all())
 
     async def count_by_department(self, department_id: uuid.UUID) -> int:
+        from app.models.programme import programme_departments
         result = await self.db.execute(
-            select(func.count()).select_from(User).where(User.department_id == department_id)
+            select(func.count()).select_from(
+                select(User.id).where(
+                    (User.department_id == department_id)
+                    | (
+                        (User.role == UserRole.STUDENT)
+                        & User.programme_id.in_(
+                            select(programme_departments.c.programme_id).where(
+                                programme_departments.c.department_id == department_id
+                            )
+                        )
+                    )
+                ).subquery()
+            )
         )
         return result.scalar_one()
 
