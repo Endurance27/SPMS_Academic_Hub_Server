@@ -34,6 +34,6 @@ class Department(Base):
 
     # Relationships
     users = relationship("User", foreign_keys="[User.department_id]", back_populates="department")
-    programmes = relationship("Programme", back_populates="department", cascade="all, delete-orphan")
+    programmes = relationship("Programme", secondary="programme_departments", back_populates="departments")
     courses = relationship("Course", back_populates="department", cascade="all, delete-orphan")
     settings = relationship("DepartmentSettings", back_populates="department", uselist=False, cascade="all, delete-orphan")
