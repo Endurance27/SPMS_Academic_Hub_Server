@@ -212,7 +212,134 @@ class DepartmentService:
             else:
                 user.department_id = None
 
-        # Department will cascade delete programmes, courses, and disable admin
+        await self.db.flush()
+
+        # Clean up all tables referencing this department.
+        # Uses raw SQL to delete in dependency order and avoid FK violations.
+        from sqlalchemy import text
+
+        dept_param = {"dept_id": department_id}
+
+        # Nullable FKs — set to NULL
+        for tbl, col in [
+            ("master_entries", "department_id"),
+            ("audit_logs", "department_id"),
+            ("notifications", "audience_department_id"),
+            ("timetable_uploads", "department_id"),
+            ("report_jobs", "department_id"),
+        ]:
+            await self.db.execute(
+                text(f"UPDATE {tbl} SET {col} = NULL WHERE {col} = :dept_id"),
+                dept_param,
+            )
+
+        # Deep children of courses
+        await self.db.execute(
+            text("""
+                DELETE FROM attendance_records
+                WHERE session_id IN (
+                    SELECT id FROM attendance_sessions WHERE course_id IN (
+                        SELECT id FROM courses WHERE department_id = :dept_id
+                    )
+                )
+            """),
+            dept_param,
+        )
+        await self.db.execute(
+            text("""
+                DELETE FROM attendance_sessions
+                WHERE course_id IN (
+                    SELECT id FROM courses WHERE department_id = :dept_id
+                )
+            """),
+            dept_param,
+        )
+        await self.db.execute(
+            text("""
+                DELETE FROM course_registrations
+                WHERE course_id IN (
+                    SELECT id FROM courses WHERE department_id = :dept_id
+                )
+            """),
+            dept_param,
+        )
+
+        # Schedule item children (join table has CASCADE but be safe)
+        await self.db.execute(
+            text("DELETE FROM schedule_items WHERE department_id = :dept_id"),
+            dept_param,
+        )
+        await self.db.execute(
+            text("DELETE FROM slot_requests WHERE department_id = :dept_id"),
+            dept_param,
+        )
+        await self.db.execute(
+            text("DELETE FROM assessments WHERE department_id = :dept_id"),
+            dept_param,
+        )
+
+        # Student imports (rows first, then imports)
+        await self.db.execute(
+            text("""
+                DELETE FROM student_import_rows
+                WHERE import_id IN (
+                    SELECT id FROM student_imports WHERE department_id = :dept_id
+                )
+            """),
+            dept_param,
+        )
+        await self.db.execute(
+            text("DELETE FROM student_imports WHERE department_id = :dept_id"),
+            dept_param,
+        )
+
+        await self.db.execute(
+            text("DELETE FROM graduation_submissions WHERE department_id = :dept_id"),
+            dept_param,
+        )
+        await self.db.execute(
+            text("DELETE FROM department_settings WHERE department_id = :dept_id"),
+            dept_param,
+        )
+
+        # Children of programmes
+        await self.db.execute(
+            text("""
+                DELETE FROM sections
+                WHERE programme_id IN (
+                    SELECT id FROM programmes WHERE department_id = :dept_id
+                )
+            """),
+            dept_param,
+        )
+        await self.db.execute(
+            text("""
+                UPDATE report_jobs SET programme_id = NULL
+                WHERE programme_id IN (
+                    SELECT id FROM programmes WHERE department_id = :dept_id
+                )
+            """),
+            dept_param,
+        )
+        await self.db.execute(
+            text("""
+                UPDATE users SET programme_id = NULL
+                WHERE programme_id IN (
+                    SELECT id FROM programmes WHERE department_id = :dept_id
+                )
+            """),
+            dept_param,
+        )
+
+        await self.db.execute(
+            text("DELETE FROM courses WHERE department_id = :dept_id"),
+            dept_param,
+        )
+        await self.db.execute(
+            text("DELETE FROM programmes WHERE department_id = :dept_id"),
+            dept_param,
+        )
+
         await self.db.delete(department)
         await self.db.commit()
 

@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_db
@@ -11,12 +11,56 @@ from app.schemas.pagination import PaginationMeta
 from app.schemas.student import (
     CohortListResponse,
     CohortResponse,
+    StudentCreate,
     StudentListResponse,
     StudentResponse,
 )
 from app.services.student_service import StudentService
 
 router = APIRouter()
+
+
+@router.post("", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
+async def onboard_student(
+    data: StudentCreate,
+    current_user: User = Depends(require_permission("students.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Onboard a single student with an invitation email."""
+    dept_id = current_user.department_id
+    if not dept_id and current_user.role != UserRole.SUPER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Department context required.",
+        )
+
+    service = StudentService(db)
+    try:
+        student, _ = await service.onboard_student(
+            name=data.name,
+            email=data.email,
+            student_number=data.student_number,
+            programme_id=data.programme_id,
+            level=data.level,
+            student_category=data.student_category.value if data.student_category else None,
+            department_id=dept_id,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        )
+
+    return StudentResponse(
+        id=student.id,
+        name=student.name,
+        email=student.email,
+        student_number=student.student_number,
+        programme_id=student.programme_id,
+        level=student.level,
+        student_category=student.student_category,
+        status=student.status,
+        created_at=student.created_at,
+    )
 
 
 @router.get("", response_model=StudentListResponse)
