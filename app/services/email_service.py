@@ -225,27 +225,58 @@ class EmailService:
         subject = f"Your password reset code — {self._sender_name}"
 
         html_body = f"""
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 0;">
-            <h2 style="color: #1a1a2e; margin-bottom: 8px;">Password Reset</h2>
-            <p style="color: #444; line-height: 1.6;">
-                Hi {user_name},
-            </p>
-            <p style="color: #444; line-height: 1.6;">
-                We received a request to reset your password. Use the code below to proceed:
-            </p>
-            <div style="text-align: center; margin: 28px 0;">
-                <span style="display: inline-block; font-size: 32px; font-weight: 700; letter-spacing: 8px;
-                             background: #f1f5f9; padding: 16px 32px; border-radius: 8px; color: #1a1a2e;">
-                    {reset_code}
-                </span>
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #0b3d91 0%, #1a56c4 100%); padding: 32px 40px; border-radius: 8px 8px 0 0;">
+                <h1 style="color: #ffffff; font-size: 20px; font-weight: 600; margin: 0;">{self._sender_name}</h1>
+                <p style="color: rgba(255,255,255,0.8); font-size: 13px; margin: 4px 0 0;">School of Physical and Mathematical Sciences</p>
             </div>
-            <p style="color: #444; line-height: 1.6;">
-                This code expires in <strong>15 minutes</strong>.
-            </p>
-            <p style="color: #888; font-size: 13px; line-height: 1.5;">
-                Request from IP: {ip_address}<br/>
-                If you did not request this, please ignore this email — your password will remain unchanged.
-            </p>
+
+            <!-- Body -->
+            <div style="padding: 32px 40px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
+                <h2 style="color: #1a365d; font-size: 22px; margin: 0 0 8px;">Password Reset</h2>
+                <p style="color: #475569; line-height: 1.7; font-size: 15px; margin: 16px 0;">
+                    Hello {user_name} &#x1F44B;,
+                </p>
+                <p style="color: #475569; line-height: 1.7; font-size: 15px; margin: 0 0 8px;">
+                    We received a request to reset your password. Use the verification code below to proceed:
+                </p>
+
+                <!-- Code Box -->
+                <div style="background: #f8f9fc; border-radius: 8px; padding: 24px; margin: 24px 0; border: 1px solid #e2e8f0; text-align: center;">
+                    <p style="color: #1a365d; font-weight: 600; font-size: 14px; margin: 0 0 16px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Your Verification Code
+                    </p>
+                    <span style="display: inline-block; font-size: 32px; font-weight: 700; letter-spacing: 8px;
+                                 font-family: 'SF Mono', SFMono-Regular, Consolas, monospace; color: #1a365d;">
+                        {reset_code}
+                    </span>
+                    <p style="color: #94a3b8; font-size: 12px; margin: 16px 0 0;">
+                        This code expires in <strong style="color: #1a365d;">15 minutes</strong>.
+                    </p>
+                </div>
+
+                <!-- Security Notice -->
+                <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 18px; margin: 24px 0; border-radius: 0 6px 6px 0;">
+                    <p style="color: #92400e; font-weight: 600; font-size: 13px; margin: 0 0 6px;">Security Notice</p>
+                    <p style="color: #78350f; font-size: 13px; margin: 0; line-height: 1.5;">
+                        This request was made from IP address <strong>{ip_address}</strong>.
+                        If you did not request this, please ignore this email &mdash; your password will remain unchanged.
+                        {self._sender_name} staff will never ask you to share this code by email or telephone.
+                    </p>
+                </div>
+
+                <p style="color: #94a3b8; font-size: 13px; text-align: center; margin: 24px 0 0;">
+                    If you did not expect this email, you can safely ignore it.
+                </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align: center; padding: 20px 40px;">
+                <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                    &copy; {self._sender_name}. All rights reserved.
+                </p>
+            </div>
         </div>
         """
 
@@ -275,19 +306,61 @@ class EmailService:
         subject = f"Your password was {action} — {self._sender_name}"
 
         html_body = f"""
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 0;">
-            <h2 style="color: #1a1a2e; margin-bottom: 8px;">Password {action.title()}</h2>
-            <p style="color: #444; line-height: 1.6;">
-                Hi {user_name},
-            </p>
-            <p style="color: #444; line-height: 1.6;">
-                Your password was successfully {action}. If you did not make this change,
-                please contact support immediately.
-            </p>
-            <p style="color: #888; font-size: 13px; line-height: 1.5;">
-                IP address: {ip_address}<br/>
-                Device: {user_agent}
-            </p>
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #0b3d91 0%, #1a56c4 100%); padding: 32px 40px; border-radius: 8px 8px 0 0;">
+                <h1 style="color: #ffffff; font-size: 20px; font-weight: 600; margin: 0;">{self._sender_name}</h1>
+                <p style="color: rgba(255,255,255,0.8); font-size: 13px; margin: 4px 0 0;">School of Physical and Mathematical Sciences</p>
+            </div>
+
+            <!-- Body -->
+            <div style="padding: 32px 40px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
+                <h2 style="color: #1a365d; font-size: 22px; margin: 0 0 8px;">Password {action.title()}</h2>
+                <p style="color: #475569; line-height: 1.7; font-size: 15px; margin: 16px 0;">
+                    Hello {user_name} &#x1F44B;,
+                </p>
+                <p style="color: #475569; line-height: 1.7; font-size: 15px; margin: 0 0 8px;">
+                    Your password was successfully {action}. If you did not make this change,
+                    please contact support immediately.
+                </p>
+
+                <!-- Device Info -->
+                <div style="background: #f8f9fc; border-radius: 8px; padding: 20px 24px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                    <p style="color: #1a365d; font-weight: 600; font-size: 14px; margin: 0 0 16px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Request Details
+                    </p>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #64748b; font-size: 13px; width: 140px;">IP Address</td>
+                            <td style="padding: 8px 0; color: #1e293b; font-family: 'SF Mono', SFMono-Regular, Consolas, monospace; font-size: 14px; font-weight: 500;">{ip_address}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0;">Device</td>
+                            <td style="padding: 8px 0; color: #1e293b; font-size: 13px; border-top: 1px solid #e2e8f0;">{user_agent}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Security Notice -->
+                <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 18px; margin: 24px 0; border-radius: 0 6px 6px 0;">
+                    <p style="color: #92400e; font-weight: 600; font-size: 13px; margin: 0 0 6px;">Security Notice</p>
+                    <p style="color: #78350f; font-size: 13px; margin: 0; line-height: 1.5;">
+                        If you did not make this change, please contact support immediately and secure your account.
+                        {self._sender_name} staff will never ask you to disclose your password by email or telephone.
+                    </p>
+                </div>
+
+                <p style="color: #94a3b8; font-size: 13px; text-align: center; margin: 24px 0 0;">
+                    If you did not expect this email, please contact support.
+                </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align: center; padding: 20px 40px;">
+                <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                    &copy; {self._sender_name}. All rights reserved.
+                </p>
+            </div>
         </div>
         """
 
