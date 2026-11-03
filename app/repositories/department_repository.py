@@ -60,8 +60,9 @@ class DepartmentRepository(BaseRepository[Department]):
             return None
         
         # Count programmes
+        from app.models.programme import programme_departments
         programmes_result = await self.db.execute(
-            select(func.count()).select_from(Programme).where(Programme.department_id == department_id)
+            select(func.count()).select_from(programme_departments).where(programme_departments.c.department_id == department_id)
         )
         programmes_count = programmes_result.scalar()
         

@@ -6,10 +6,11 @@ from typing import List, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.security import SecurityService
 from app.models.invitation import Invitation
-from app.models.programme import Programme
+from app.models.programme import Programme, programme_departments
 from app.models.user import User, UserRole, UserStatus
 from app.services.email_service import EmailService
 
@@ -18,6 +19,19 @@ class StudentService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.email_service = EmailService()
+
+    async def _resolve_department_from_programme(
+        self, programme_id: Optional[uuid.UUID]
+    ) -> Optional[uuid.UUID]:
+        if not programme_id:
+            return None
+        result = await self.db.execute(
+            select(programme_departments.c.department_id)
+            .where(programme_departments.c.programme_id == programme_id)
+            .limit(1)
+        )
+        row = result.first()
+        return row[0] if row else None
 
     async def onboard_student(
         self,
@@ -40,6 +54,11 @@ class StudentService:
             if existing_sn.scalar_one_or_none():
                 raise ValueError("A student with this student number already exists.")
 
+        if programme_id:
+            dept_id = await self._resolve_department_from_programme(programme_id)
+        else:
+            dept_id = department_id
+
         temp_password = SecurityService.generate_role_temp_password("student", email)
         hashed_pw = SecurityService.get_password_hash(temp_password)
 
@@ -53,7 +72,7 @@ class StudentService:
             programme_id=programme_id,
             level=level,
             student_category=student_category,
-            department_id=department_id,
+            department_id=dept_id,
             title=f"Level {level} Student" if level else "Student",
         )
         self.db.add(student)
@@ -108,7 +127,9 @@ class StudentService:
         if department_id:
             query = query.where(
                 User.programme_id.in_(
-                    select(Programme.id).where(Programme.department_id == department_id)
+                    select(programme_departments.c.programme_id).where(
+                        programme_departments.c.department_id == department_id
+                    )
                 )
             )
         if programme_id:
@@ -167,7 +188,13 @@ class StudentService:
         )
 
         if department_id:
-            query = query.where(Programme.department_id == department_id)
+            query = query.where(
+                Programme.id.in_(
+                    select(programme_departments.c.programme_id).where(
+                        programme_departments.c.department_id == department_id
+                    )
+                )
+            )
 
         result = await self.db.execute(query)
         rows = result.all()

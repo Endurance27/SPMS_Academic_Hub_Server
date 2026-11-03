@@ -344,7 +344,8 @@ class ReportService:
         headers = ["Programme", "Level", "Category", "Students"]
         q = select(Programme)
         if department_id:
-            q = q.where(Programme.department_id == department_id)
+            from app.models.programme import programme_departments
+            q = q.join(programme_departments).where(programme_departments.c.department_id == department_id)
         result = await self.db.execute(q.order_by(Programme.code))
         rows = []
         for p in result.scalars().all():

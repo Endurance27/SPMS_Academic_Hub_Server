@@ -23,6 +23,7 @@ from app.models.registration import (
     StudentImport,
     StudentImportRow,
 )
+from app.models.programme import programme_departments
 from app.models.user import User, UserRole, UserStatus
 from app.services.email_service import EmailService
 
@@ -31,6 +32,19 @@ class ImportService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.email_service = EmailService()
+
+    async def _resolve_department_from_programme(
+        self, programme_id: Optional[uuid.UUID]
+    ) -> Optional[uuid.UUID]:
+        if not programme_id:
+            return None
+        result = await self.db.execute(
+            select(programme_departments.c.department_id)
+            .where(programme_departments.c.programme_id == programme_id)
+            .limit(1)
+        )
+        row = result.first()
+        return row[0] if row else None
 
     async def create_student_import(
         self,
@@ -72,6 +86,8 @@ class ImportService:
         self.db.add(import_obj)
         await self.db.flush()
 
+        student_dept_id = await self._resolve_department_from_programme(programme_id) or department_id
+
         created_count = 0
         updated_count = 0
         warning_count = 0
@@ -104,6 +120,7 @@ class ImportService:
                         existing_user.student_number = student_number
                     if programme_id and not existing_user.programme_id:
                         existing_user.programme_id = programme_id
+                        existing_user.department_id = existing_user.department_id or student_dept_id
                     if level and not existing_user.level:
                         existing_user.level = level
                     outcome = ImportRowOutcome.UPDATED
@@ -123,6 +140,7 @@ class ImportService:
                         programme_id=programme_id,
                         level=level,
                         student_category=student_category,
+                        department_id=student_dept_id,
                         title=f"Level {level} Student" if level else "Student",
                     )
                     self.db.add(new_user)

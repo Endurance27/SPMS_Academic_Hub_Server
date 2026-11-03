@@ -1,9 +1,11 @@
 import asyncio
 import logging
+import re
 import uuid
 import json
 from typing import Optional, List, Dict, Any, Set
 from datetime import datetime
+from collections import defaultdict
 
 from sqlalchemy import select, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +24,46 @@ from app.utils.timetable_parser import TimetableParser
 logger = logging.getLogger(__name__)
 
 SKIP_VENUE_CODES = {"DEPT", "ONLINE", "FREE", "TBA", "TBD", "N/A", ""}
+
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+
+
+def _extract_subject_prefix(subject: str) -> str:
+    """Extract the alphabetic department prefix from a subject.
+    'DCIT 111 (C)' → 'DCIT', 'MATH' → 'MATH', 'FREE' → 'FREE'
+    """
+    cleaned = re.sub(r'\s*\([CE]\)\s*$', '', subject.strip())
+    m = re.match(r'^([A-Z]+)', cleaned.strip())
+    return m.group(1) if m else cleaned.strip()
+
+
+def _merge_entries(entries: list) -> list:
+    """Merge department entries over matching master entries.
+
+    For each (day, period, level) slot, if a department entry shares the same
+    subject prefix as a master entry, the department entry replaces the master.
+    """
+    slots: Dict[tuple, Dict[str, Dict[str, list]]] = defaultdict(
+        lambda: defaultdict(lambda: {"master": [], "dept": []})
+    )
+    for entry in entries:
+        key = (entry.day, entry.period, entry.level)
+        prefix = _extract_subject_prefix(entry.subject)
+        if entry.department_id is None:
+            slots[key][prefix]["master"].append(entry)
+        else:
+            slots[key][prefix]["dept"].append(entry)
+
+    merged = []
+    for prefix_groups in slots.values():
+        for pair in prefix_groups.values():
+            if pair["dept"]:
+                merged.extend(pair["dept"])
+            else:
+                merged.extend(pair["master"])
+
+    merged.sort(key=lambda e: (e.day, e.period, e.venue_code))
+    return merged
 
 
 async def sync_venues_from_codes(venue_codes: Set[str]) -> None:
@@ -48,7 +90,6 @@ async def sync_venues_from_codes(venue_codes: Set[str]) -> None:
                 return
 
             for code in new_codes:
-                import re
                 match = re.match(r"^([A-Za-z]+)(\d+.*)$", code)
                 if match:
                     building = match.group(1)
@@ -130,10 +171,9 @@ class MasterTimetableService:
             .where(MasterEntry.timetable_id == timetable_id)
             .order_by(MasterEntry.day, MasterEntry.period, MasterEntry.venue_code)
         )
-        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
         shared_venues = {"DEPT", "ONLINE"}
 
-        all_entries = entries_result.scalars().all()
+        all_entries = _merge_entries(list(entries_result.scalars().all()))
 
         master_slot_subjects: Dict[tuple, set] = {}
         dept_slot_subjects: Dict[tuple, set] = {}
@@ -165,7 +205,7 @@ class MasterTimetableService:
                 "course_code": entry.subject,
                 "subject": entry.subject,
                 "day": entry.day,
-                "day_name": day_names[entry.day] if 0 <= entry.day < len(day_names) else None,
+                "day_name": DAY_NAMES[entry.day] if 0 <= entry.day < len(DAY_NAMES) else None,
                 "period": entry.period,
                 "period_start": f"{period_start_hour:02d}:30",
                 "period_end": f"{period_start_hour + 1:02d}:20",
@@ -173,6 +213,7 @@ class MasterTimetableService:
                 "is_free": entry.is_free,
                 "department_id": str(entry.department_id) if entry.department_id else None,
                 "course_kind": entry.course_kind,
+                "source": "department" if entry.department_id else "master",
                 "double_booked": clashing is not None,
                 "clashing_subjects": sorted(clashing) if clashing else [],
             })
@@ -181,7 +222,7 @@ class MasterTimetableService:
             {
                 "venue": k[0],
                 "day": k[1],
-                "day_name": day_names[k[1]] if 0 <= k[1] < len(day_names) else None,
+                "day_name": DAY_NAMES[k[1]] if 0 <= k[1] < len(DAY_NAMES) else None,
                 "period": k[2],
                 "subjects": sorted(v),
             }
@@ -230,33 +271,54 @@ class MasterTimetableService:
     ) -> tuple[List[Dict], Dict]:
         """Get timetable entries with filtering.
 
-        ``source`` can be ``"master"`` (department_id IS NULL) or
-        ``"department"`` (department_id IS NOT NULL).
+        When ``source`` is omitted, returns a **merged** view: department
+        entries override matching master entries (matched by day/period/level
+        and subject prefix).  Pass ``source="master"`` or
+        ``source="department"`` for raw, un-merged entries.
         """
-        entries = await self.repo.get_entries(
-            semester_id=semester_id,
-            level=level,
-            venue_code=venue_code,
-            subjects=subjects,
-            day=day,
-            source=source,
-            department_id=department_id,
-        )
+        do_merge = source is None and department_id is None
+
+        if do_merge:
+            all_entries = await self.repo.get_entries(
+                semester_id=semester_id,
+                level=level,
+                day=day,
+            )
+            entries = _merge_entries(all_entries)
+
+            if venue_code is not None:
+                entries = [e for e in entries if e.venue_code == venue_code]
+            if subjects is not None:
+                entries = [e for e in entries if e.subject in subjects]
+        else:
+            entries = await self.repo.get_entries(
+                semester_id=semester_id,
+                level=level,
+                venue_code=venue_code,
+                subjects=subjects,
+                day=day,
+                source=source,
+                department_id=department_id,
+            )
 
         meta = {}
         if level is None:
-            levels = [100, 200, 300, 400]
-            for lvl in levels:
-                level_entries = await self.repo.get_entries(
-                    semester_id, level=lvl, source=source, department_id=department_id,
-                )
-                meta[f"level_{lvl}_count"] = len(level_entries)
-                meta[f"level_{lvl}_free"] = sum(1 for e in level_entries if e.is_free)
+            if do_merge:
+                for lvl in [100, 200, 300, 400]:
+                    lvl_entries = [e for e in entries if e.level == lvl]
+                    meta[f"level_{lvl}_count"] = len(lvl_entries)
+                    meta[f"level_{lvl}_free"] = sum(1 for e in lvl_entries if e.is_free)
+            else:
+                for lvl in [100, 200, 300, 400]:
+                    level_entries = await self.repo.get_entries(
+                        semester_id, level=lvl, source=source, department_id=department_id,
+                    )
+                    meta[f"level_{lvl}_count"] = len(level_entries)
+                    meta[f"level_{lvl}_free"] = sum(1 for e in level_entries if e.is_free)
 
         meta["total_count"] = len(entries)
         meta["free_count"] = sum(1 for e in entries if e.is_free)
 
-        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
         result = []
         for entry in entries:
             period_start_hour = 7 + entry.period
@@ -265,7 +327,7 @@ class MasterTimetableService:
                 "timetable_id": str(entry.timetable_id),
                 "level": entry.level,
                 "day": entry.day,
-                "day_name": day_names[entry.day] if 0 <= entry.day < len(day_names) else None,
+                "day_name": DAY_NAMES[entry.day] if 0 <= entry.day < len(DAY_NAMES) else None,
                 "period": entry.period,
                 "period_start": f"{period_start_hour:02d}:30",
                 "period_end": f"{period_start_hour + 1:02d}:20",
@@ -273,7 +335,8 @@ class MasterTimetableService:
                 "venue_code": entry.venue_code,
                 "is_free": entry.is_free,
                 "department_id": str(entry.department_id) if entry.department_id else None,
-                "course_kind": entry.course_kind
+                "course_kind": entry.course_kind,
+                "source": "department" if entry.department_id else "master",
             })
 
         return result, meta
@@ -441,6 +504,7 @@ class MasterTimetableService:
                 filtered_entries.append(entry)
 
         conflicts = await self._check_department_conflicts(semester_id, department_id, filtered_entries)
+        master_warnings = await self._check_master_compatibility(semester_id, filtered_entries)
 
         preview_id = str(uuid.uuid4())
 
@@ -459,11 +523,13 @@ class MasterTimetableService:
             "preview_id": preview_id,
             "entries": filtered_entries,
             "conflicts": conflicts,
+            "warnings": master_warnings,
             "summary": {
                 "entry_count": len(filtered_entries),
                 "levels": levels,
                 "venues": venues,
                 "conflict_count": len(conflicts),
+                "warning_count": len(master_warnings),
             },
         }
 
@@ -621,6 +687,69 @@ class MasterTimetableService:
                     break
 
         return affected
+
+    async def _check_master_compatibility(
+        self,
+        semester_id: uuid.UUID,
+        entries: List[Dict],
+    ) -> List[Dict]:
+        """Validate department entries against master timetable allocations.
+
+        For each department entry at (day, period, level), checks that its
+        subject prefix matches a master entry at the same slot.  Returns
+        warnings for mismatches (e.g. master has DCIT but dept entry is EASC111).
+        """
+        master_entries = await self.repo.get_entries(
+            semester_id=semester_id,
+            source="master",
+        )
+
+        master_lookup: Dict[tuple, List[Dict]] = defaultdict(list)
+        for me in master_entries:
+            if me.is_free:
+                continue
+            key = (me.day, me.period, me.level)
+            master_lookup[key].append({
+                "subject": me.subject,
+                "prefix": _extract_subject_prefix(me.subject),
+                "venue_code": me.venue_code,
+            })
+
+        warnings: List[Dict] = []
+        for entry in entries:
+            if entry.get("is_free"):
+                continue
+
+            dept_prefix = _extract_subject_prefix(entry["subject"])
+            level = entry.get("level", 0)
+            key = (entry["day"], entry["period"], level)
+            masters_at_slot = master_lookup.get(key, [])
+
+            if not masters_at_slot:
+                continue
+
+            if any(m["prefix"] == dept_prefix for m in masters_at_slot):
+                continue
+
+            master_subjects = [m["subject"] for m in masters_at_slot]
+            day_name = DAY_NAMES[entry["day"]] if 0 <= entry["day"] < 5 else f"Day {entry['day']}"
+            warnings.append({
+                "type": "master_mismatch",
+                "severity": "error",
+                "level": level,
+                "day": entry["day"],
+                "day_name": day_name,
+                "period": entry["period"],
+                "department_subject": entry["subject"],
+                "department_venue": entry.get("venue_code", ""),
+                "master_subjects": master_subjects,
+                "message": (
+                    f"{entry['subject']} at {day_name} period {entry['period'] + 1} (L{level}) "
+                    f"does not match master allocation: {', '.join(master_subjects)}"
+                ),
+            })
+
+        return warnings
 
     async def _check_department_conflicts(
         self,
