@@ -141,21 +141,17 @@ async def update_course(
     db: AsyncSession = Depends(get_db)
 ):
     """Update course"""
+    await check_course_access(course_id, current_user, db)
+
     service = CourseService(db)
-    course = await service.get_course(course_id)
-
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    # Scope check
-    if current_user.role == UserRole.DEPARTMENT:
-        if course.department_id != current_user.department_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-
     try:
-        return await service.update_course(course_id, data)
+        result = await service.update_course(course_id, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return result
 
 
 @router.delete("/{course_id}", status_code=204)
@@ -166,17 +162,9 @@ async def delete_course(
     db: AsyncSession = Depends(get_db)
 ):
     """Delete course"""
+    await check_course_access(course_id, current_user, db)
+
     service = CourseService(db)
-    course = await service.get_course(course_id)
-
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    # Scope check
-    if current_user.role == UserRole.DEPARTMENT:
-        if course.department_id != current_user.department_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-
     try:
         await service.delete_course(course_id, force)
     except ValueError as e:
