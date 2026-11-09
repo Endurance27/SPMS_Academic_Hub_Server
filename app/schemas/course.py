@@ -38,8 +38,17 @@ class CourseUpdate(BaseModel):
     cohorts: Optional[List[CourseCohort]] = None
 
 
-class CourseResponse(CourseBase):
+class CourseResponse(BaseModel):
     id: uuid.UUID
+    code: str
+    title: str
+    department_id: uuid.UUID
+    type: CourseType
+    credit_hours: int
+    mode: CourseMode
+    student_count: int
+    lecturer_id: Optional[uuid.UUID] = None
+    cohorts: List[CourseCohort] = []
     created_at: datetime
     updated_at: datetime
 
