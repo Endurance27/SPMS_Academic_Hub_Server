@@ -79,6 +79,34 @@ class FacultyService:
 
         return faculty_list, total
 
+    async def get_faculty(self, faculty_id: uuid.UUID) -> Optional[dict]:
+        result = await self.db.execute(
+            select(
+                User,
+                func.count(Course.id).label("course_count"),
+            )
+            .outerjoin(Course, Course.lecturer_id == User.id)
+            .where(User.id == faculty_id, User.role == UserRole.LECTURER)
+            .group_by(User.id)
+        )
+        row = result.first()
+        if not row:
+            return None
+
+        user, course_count = row
+        return {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "rank": user.rank,
+            "staff_id": user.staff_id,
+            "department_id": user.department_id,
+            "status": user.status,
+            "course_count": course_count,
+            "last_login_at": user.last_login_at,
+            "created_at": user.created_at,
+        }
+
     async def create_faculty(
         self, data: FacultyCreate, department_id: uuid.UUID
     ) -> User:

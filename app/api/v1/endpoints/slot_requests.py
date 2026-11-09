@@ -48,7 +48,7 @@ async def check_slot_request(
 ):
     """Check for clashes before submitting slot request"""
     service = SlotRequestService(db)
-    clashes = await service.check_clashes(data, current_user)
+    clashes = await service.check_clashes(data.model_dump(), current_user)
     return {"clashes": clashes, "blocking": any(c.severity == "danger" for c in clashes)}
 
 
@@ -60,16 +60,17 @@ async def create_slot_request(
 ):
     """Submit slot request"""
     service = SlotRequestService(db)
+    data_dict = data.model_dump()
 
     # Check clashes first
-    clashes = await service.check_clashes(data, current_user)
+    clashes = await service.check_clashes(data_dict, current_user)
     if any(c.severity == "danger" for c in clashes):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": "CLASH_BLOCKED", "clashes": clashes}
         )
 
-    request = await service.create_request(data, current_user)
+    request = await service.create_request(data_dict, current_user)
     return request
 
 

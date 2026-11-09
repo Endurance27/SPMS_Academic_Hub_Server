@@ -50,6 +50,28 @@ async def list_faculty(
     )
 
 
+@router.get("/{faculty_id}", response_model=FacultyResponse)
+async def get_faculty(
+    faculty_id: UUID,
+    current_user: User = Depends(require_permission("staff.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FacultyService(db)
+    faculty = await service.get_faculty(faculty_id)
+    if not faculty:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Faculty member not found"
+        )
+
+    if current_user.role == UserRole.DEPARTMENT:
+        if faculty["department_id"] != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+            )
+
+    return FacultyResponse(**faculty)
+
+
 @router.post("", response_model=FacultyResponse, status_code=status.HTTP_201_CREATED)
 async def create_faculty(
     data: FacultyCreate,
