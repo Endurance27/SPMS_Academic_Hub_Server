@@ -13,6 +13,7 @@ from app.models.invitation import Invitation
 from app.models.programme import Programme, programme_departments
 from app.models.user import User, UserRole, UserStatus
 from app.services.email_service import EmailService
+from app.services.role_service import assign_system_role
 
 
 class StudentService:
@@ -77,6 +78,8 @@ class StudentService:
         )
         self.db.add(student)
         await self.db.flush()
+
+        await assign_system_role(self.db, student)
 
         raw_token = secrets.token_urlsafe(48)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()

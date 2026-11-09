@@ -138,6 +138,36 @@ async def seed_roles(db: AsyncSession, permissions_by_code: dict[str, Permission
     await db.commit()
 
 
+async def backfill_user_roles(db: AsyncSession) -> None:
+    """Assign system roles to existing users who are missing the user_roles link."""
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+
+    roles_cache: dict[str, Role] = {}
+    backfilled = 0
+
+    for user in users:
+        role_code = user.role.value if hasattr(user.role, "value") else user.role
+        if role_code not in roles_cache:
+            role_result = await db.execute(select(Role).where(Role.code == role_code))
+            role = role_result.scalar_one_or_none()
+            if role:
+                roles_cache[role_code] = role
+
+        role = roles_cache.get(role_code)
+        if not role:
+            continue
+
+        stmt = pg_insert(user_roles).values(
+            user_id=user.id, role_id=role.id
+        ).on_conflict_do_nothing(index_elements=["user_id", "role_id"])
+        await db.execute(stmt)
+        backfilled += 1
+
+    await db.commit()
+    logger.info(f"Backfilled user_roles for {backfilled} users")
+
+
 async def seed_permissions_and_roles() -> None:
     async with AsyncSessionLocal() as db:
         try:
@@ -145,6 +175,7 @@ async def seed_permissions_and_roles() -> None:
             permissions_by_code = await seed_permissions(db)
             await seed_role_templates(db, permissions_by_code)
             await seed_roles(db, permissions_by_code)
+            await backfill_user_roles(db)
             logger.info("Permissions and roles seeded successfully")
         except Exception as e:
             logger.error(f"Error seeding permissions and roles: {e}")

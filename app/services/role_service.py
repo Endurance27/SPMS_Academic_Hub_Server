@@ -3,12 +3,31 @@ from typing import List
 
 from fastapi import HTTPException, status
 from sqlalchemy import insert, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.role import Permission, Role, role_permissions
+from app.models.role import Permission, Role, role_permissions, user_roles
+from app.models.user import User
 from app.repositories.role_repository import PermissionRepository, RoleRepository
 from app.schemas.role import RoleUpdate
+
+
+async def assign_system_role(db: AsyncSession, user: User) -> None:
+    """Link a user to the system Role record that matches their role enum.
+
+    Must be called after the user is flushed (so user.id exists) and before commit.
+    """
+    result = await db.execute(
+        select(Role).where(Role.code == user.role.value)
+    )
+    role = result.scalar_one_or_none()
+    if role is None:
+        return
+    stmt = pg_insert(user_roles).values(
+        user_id=user.id, role_id=role.id
+    ).on_conflict_do_nothing(index_elements=["user_id", "role_id"])
+    await db.execute(stmt)
 
 
 class RoleService:

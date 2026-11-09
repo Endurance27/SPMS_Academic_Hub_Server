@@ -26,6 +26,7 @@ from app.models.registration import (
 from app.models.programme import programme_departments
 from app.models.user import User, UserRole, UserStatus
 from app.services.email_service import EmailService
+from app.services.role_service import assign_system_role
 
 
 class ImportService:
@@ -145,6 +146,8 @@ class ImportService:
                     )
                     self.db.add(new_user)
                     await self.db.flush()
+
+                    await assign_system_role(self.db, new_user)
 
                     raw_token = secrets.token_urlsafe(48)
                     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
@@ -274,6 +277,7 @@ class ImportService:
                     )
                     self.db.add(student)
                     await self.db.flush()
+                    await assign_system_role(self.db, student)
                     outcome = ImportRowOutcome.CREATED
                     created_count += 1
                 else:

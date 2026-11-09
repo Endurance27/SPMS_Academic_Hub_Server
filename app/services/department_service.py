@@ -17,6 +17,7 @@ from app.repositories.department_repository import DepartmentRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.department import DepartmentCreate, DepartmentUpdate
 from app.services.email_service import EmailService
+from app.services.role_service import assign_system_role
 
 
 class DepartmentService:
@@ -91,6 +92,8 @@ class DepartmentService:
         )
         self.db.add(admin_user)
         await self.db.flush()
+
+        await assign_system_role(self.db, admin_user)
 
         # Create invitation record and send email
         raw_token = secrets.token_urlsafe(48)
@@ -302,31 +305,28 @@ class DepartmentService:
             dept_param,
         )
 
-        # Children of programmes
+        # Children of programmes owned by this department
+        dept_programmes_subq = (
+            "SELECT programme_id FROM programme_departments WHERE department_id = :dept_id"
+        )
         await self.db.execute(
-            text("""
+            text(f"""
                 DELETE FROM sections
-                WHERE programme_id IN (
-                    SELECT id FROM programmes WHERE department_id = :dept_id
-                )
+                WHERE programme_id IN ({dept_programmes_subq})
             """),
             dept_param,
         )
         await self.db.execute(
-            text("""
+            text(f"""
                 UPDATE report_jobs SET programme_id = NULL
-                WHERE programme_id IN (
-                    SELECT id FROM programmes WHERE department_id = :dept_id
-                )
+                WHERE programme_id IN ({dept_programmes_subq})
             """),
             dept_param,
         )
         await self.db.execute(
-            text("""
+            text(f"""
                 UPDATE users SET programme_id = NULL
-                WHERE programme_id IN (
-                    SELECT id FROM programmes WHERE department_id = :dept_id
-                )
+                WHERE programme_id IN ({dept_programmes_subq})
             """),
             dept_param,
         )
@@ -335,8 +335,21 @@ class DepartmentService:
             text("DELETE FROM courses WHERE department_id = :dept_id"),
             dept_param,
         )
+        # Remove programmes exclusively owned by this department
         await self.db.execute(
-            text("DELETE FROM programmes WHERE department_id = :dept_id"),
+            text(f"""
+                DELETE FROM programmes
+                WHERE id IN ({dept_programmes_subq})
+                AND id NOT IN (
+                    SELECT programme_id FROM programme_departments
+                    WHERE department_id != :dept_id
+                )
+            """),
+            dept_param,
+        )
+        # Remove junction table entries for this department
+        await self.db.execute(
+            text("DELETE FROM programme_departments WHERE department_id = :dept_id"),
             dept_param,
         )
 

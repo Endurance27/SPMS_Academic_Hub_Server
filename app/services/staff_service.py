@@ -14,6 +14,7 @@ from app.models.invitation import Invitation
 from app.models.user import User, UserRole, UserStatus
 from app.schemas.staff import StaffCreate, StaffUpdate
 from app.services.email_service import EmailService
+from app.services.role_service import assign_system_role
 
 
 class StaffService:
@@ -142,6 +143,8 @@ class StaffService:
         )
         self.db.add(user)
         await self.db.flush()
+
+        await assign_system_role(self.db, user)
 
         # Create invitation and send email
         raw_token = secrets.token_urlsafe(48)
