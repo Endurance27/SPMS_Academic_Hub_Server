@@ -1,4 +1,5 @@
 import uuid
+from collections import defaultdict
 from typing import List, Optional
 
 from sqlalchemy import delete, func, select
@@ -16,7 +17,41 @@ class CourseService:
         self.db = db
         self.course_repo = CourseRepository(db)
 
-    async def create_course(self, data: CourseCreate) -> Course:
+    async def _load_cohorts(self, course_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[dict]]:
+        """Load cohorts for a list of course IDs, keyed by course_id."""
+        if not course_ids:
+            return {}
+        result = await self.db.execute(
+            select(
+                course_cohorts.c.course_id,
+                course_cohorts.c.programme_id,
+                course_cohorts.c.level,
+            ).where(course_cohorts.c.course_id.in_(course_ids))
+        )
+        cohorts_map: dict[uuid.UUID, list[dict]] = defaultdict(list)
+        for row in result.all():
+            cohorts_map[row.course_id].append(
+                {"programme_id": row.programme_id, "level": row.level}
+            )
+        return cohorts_map
+
+    def _course_to_dict(self, course: Course, cohorts: list[dict]) -> dict:
+        return {
+            "id": course.id,
+            "code": course.code,
+            "title": course.title,
+            "department_id": course.department_id,
+            "type": course.type,
+            "credit_hours": course.credit_hours,
+            "mode": course.mode,
+            "student_count": course.student_count,
+            "lecturer_id": course.lecturer_id,
+            "cohorts": cohorts,
+            "created_at": course.created_at,
+            "updated_at": course.updated_at,
+        }
+
+    async def create_course(self, data: CourseCreate) -> dict:
         existing = await self.course_repo.get_by_code(data.code)
         if existing:
             raise ValueError(f"{data.code} already exists")
@@ -51,9 +86,8 @@ class CourseService:
         self.db.add(course)
         await self.db.flush()
 
-        # Add cohorts using the association table
         for cohort in data.cohorts:
-            self.db.execute(
+            await self.db.execute(
                 course_cohorts.insert().values(
                     course_id=course.id,
                     programme_id=cohort.programme_id,
@@ -63,10 +97,16 @@ class CourseService:
 
         await self.db.commit()
         await self.db.refresh(course)
-        return course
 
-    async def get_course(self, course_id: uuid.UUID) -> Optional[Course]:
-        return await self.course_repo.get_by_id(course_id)
+        cohorts_map = await self._load_cohorts([course.id])
+        return self._course_to_dict(course, cohorts_map.get(course.id, []))
+
+    async def get_course(self, course_id: uuid.UUID) -> Optional[dict]:
+        course = await self.course_repo.get_by_id(course_id)
+        if not course:
+            return None
+        cohorts_map = await self._load_cohorts([course.id])
+        return self._course_to_dict(course, cohorts_map.get(course.id, []))
 
     async def list_courses(
         self,
@@ -82,59 +122,65 @@ class CourseService:
             department_id, lecturer_id, programme_id, level, search, skip, limit
         )
 
+        course_ids = [c.id for c in courses]
+        cohorts_map = await self._load_cohorts(course_ids)
+        data = [
+            self._course_to_dict(c, cohorts_map.get(c.id, []))
+            for c in courses
+        ]
+
         extra = {}
         if department_id:
             extra["without_lecturer"] = await self.course_repo.count_without_lecturer(department_id)
 
-        return courses, total, extra
+        return data, total, extra
 
     async def update_course(
         self,
         course_id: uuid.UUID,
         data: CourseUpdate
-    ) -> Optional[Course]:
+    ) -> Optional[dict]:
         course = await self.course_repo.get_by_id(course_id)
         if not course:
             return None
-        
+
         if data.code and data.code != course.code:
             existing = await self.course_repo.get_by_code(data.code)
             if existing:
                 raise ValueError(f"{data.code} already exists")
-        
+
         if data.lecturer_id:
             lecturer = await self.db.get(User, data.lecturer_id)
             if not lecturer or lecturer.role != UserRole.LECTURER:
                 raise ValueError("Invalid lecturer")
-        
-        # Update cohorts if provided
+
         if data.cohorts is not None:
-            # Delete existing cohorts
             delete_stmt = delete(course_cohorts).where(course_cohorts.c.course_id == course_id)
             await self.db.execute(delete_stmt)
-            # Add new cohorts
             for cohort in data.cohorts:
                 programme = await self.db.get(Programme, cohort.programme_id)
                 if not programme or cohort.level not in programme.levels:
                     raise ValueError("Invalid cohort")
-                self.db.execute(
+                await self.db.execute(
                     course_cohorts.insert().values(
                         course_id=course.id,
                         programme_id=cohort.programme_id,
                         level=cohort.level
                     )
                 )
-        
+
         update_data = data.model_dump(exclude_unset=True, exclude={"cohorts"})
         if update_data.get("code"):
             update_data["code"] = update_data["code"].upper()
-        
+
         for field, value in update_data.items():
             setattr(course, field, value)
-        
+
         await self.db.commit()
         await self.db.refresh(course)
-        return course
+
+        cohorts_map = await self._load_cohorts([course.id])
+        return self._course_to_dict(course, cohorts_map.get(course.id, []))
 
     async def delete_course(self, course_id: uuid.UUID, force: bool = False) -> bool:
         course = await self.course_repo.get_by_id(course_id)
