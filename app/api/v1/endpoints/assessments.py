@@ -57,7 +57,7 @@ async def create_assessment(
 ):
     """Create assessment"""
     service = AssessmentService(db)
-    return await service.create_assessment(data, save_as_draft, current_user)
+    return await service.create_assessment(data.model_dump(), save_as_draft, current_user)
 
 
 @router.get("/{assessment_id}", response_model=AssessmentResponse)
@@ -83,7 +83,7 @@ async def update_assessment(
 ):
     """Update assessment"""
     service = AssessmentService(db)
-    return await service.update_assessment(assessment_id, data, current_user)
+    return await service.update_assessment(assessment_id, data.model_dump(exclude_unset=True), current_user)
 
 
 @router.post("/{assessment_id}/submit", response_model=AssessmentResponse)

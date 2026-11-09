@@ -58,7 +58,7 @@ async def create_session(
 ):
     """Create attendance session"""
     service = AttendanceService(db)
-    return await service.create_session(data, current_user)
+    return await service.create_session(data.model_dump(), current_user)
 
 
 @router.post("/sessions/{session_id}/open", response_model=AttendanceSessionResponse)
@@ -113,7 +113,7 @@ async def create_record(
 ):
     """Manual attendance record"""
     service = AttendanceService(db)
-    return await service.create_record(data, current_user)
+    return await service.create_record(data.model_dump(), current_user)
 
 
 @router.post("/records/bulk")
