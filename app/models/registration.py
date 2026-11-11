@@ -22,6 +22,11 @@ class RegistrationStatus(str, enum.Enum):
     PENDING_APPROVAL = "Pending approval"
 
 
+class RegistrationSource(str, enum.Enum):
+    SELF = "SELF"
+    ROSTER_IMPORT = "ROSTER_IMPORT"
+
+
 class CourseRegistration(Base):
     __tablename__ = "course_registrations"
 
@@ -37,7 +42,7 @@ class CourseRegistration(Base):
     registration_type = Column(Enum(RegistrationType), nullable=False)
     credits = Column(Integer, nullable=False)
     status = Column(Enum(RegistrationStatus), default=RegistrationStatus.REGISTERED)
-    source = Column(String(50))  # "self" or "roster-import"
+    source = Column(Enum(RegistrationSource), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
