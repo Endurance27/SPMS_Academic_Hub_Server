@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.course import Course, course_cohorts
 from app.models.department import Department
-from app.models.registration import CourseRegistration, RegistrationStatus
+from app.models.registration import CourseRegistration, RegistrationSource, RegistrationStatus
 from app.models.semester import Semester
 from app.models.user import User
 from app.schemas.registration import RegistrationCreate
@@ -178,7 +178,7 @@ class RegistrationService:
             registration_type=data.registration_type,
             credits=data.credits,
             status=status,
-            source="self",
+            source=RegistrationSource.SELF,
         )
         self.db.add(registration)
         await self.db.commit()
