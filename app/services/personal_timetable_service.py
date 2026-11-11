@@ -9,9 +9,12 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.course import Course, course_cohorts
+from app.models.department import Department
 from app.models.master_timetable import MasterTimetable, MasterEntry
 from app.models.registration import CourseRegistration, RegistrationStatus
 from app.models.semester import Semester
+from app.models.user import User
+from app.models.venue import Venue
 
 
 DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -219,3 +222,90 @@ class PersonalTimetableService:
             })
 
         return output.getvalue()
+
+    async def get_entry_detail(
+        self,
+        entry_id: uuid.UUID,
+    ) -> Optional[Dict[str, Any]]:
+        result = await self.db.execute(
+            select(MasterEntry).where(MasterEntry.id == entry_id)
+        )
+        entry = result.scalar_one_or_none()
+        if not entry:
+            return None
+
+        if entry.start_time and entry.end_time:
+            period_start = entry.start_time
+            period_end = entry.end_time
+        else:
+            h = 7 + entry.period
+            period_start = f"{h:02d}:30"
+            period_end = f"{h + 1:02d}:20"
+
+        data: Dict[str, Any] = {
+            "id": entry.id,
+            "level": entry.level,
+            "course_code": entry.subject,
+            "subject": entry.subject,
+            "day": entry.day,
+            "day_name": DAY_NAMES[entry.day] if 0 <= entry.day < len(DAY_NAMES) else None,
+            "period": entry.period,
+            "period_start": period_start,
+            "period_end": period_end,
+            "venue_code": entry.venue_code,
+            "is_free": entry.is_free,
+            "course_kind": entry.course_kind,
+            "source": "department" if entry.department_id else "master",
+        }
+
+        norm_code = _normalize_course_code(entry.subject)
+        course_result = await self.db.execute(
+            select(Course).where(
+                func.upper(func.replace(Course.code, ' ', '')) == norm_code
+            )
+        )
+        course = course_result.scalar_one_or_none()
+
+        if course:
+            data["course_id"] = course.id
+            data["course_title"] = course.title
+            data["course_type"] = course.type.value if course.type else None
+            data["course_mode"] = course.mode.value if course.mode else None
+            data["credit_hours"] = course.credit_hours
+
+            if course.lecturer_id:
+                lec_result = await self.db.execute(
+                    select(User).where(User.id == course.lecturer_id)
+                )
+                lecturer = lec_result.scalar_one_or_none()
+                if lecturer:
+                    data["lecturer_id"] = lecturer.id
+                    data["lecturer_name"] = lecturer.name
+                    data["lecturer_email"] = lecturer.email
+                    data["lecturer_office"] = lecturer.office
+
+            dept_result = await self.db.execute(
+                select(Department).where(Department.id == course.department_id)
+            )
+            dept = dept_result.scalar_one_or_none()
+            if dept:
+                data["department_id"] = dept.id
+                data["department_name"] = dept.name
+                data["department_code"] = dept.code
+
+        venue_result = await self.db.execute(
+            select(Venue).where(Venue.code == entry.venue_code)
+        )
+        venue = venue_result.scalar_one_or_none()
+        if venue:
+            data["venue"] = {
+                "id": venue.id,
+                "code": venue.code,
+                "building": venue.building,
+                "room_number": venue.room_number,
+                "location": venue.location,
+                "capacity": venue.capacity,
+                "type": venue.type.value if venue.type else None,
+            }
+
+        return data
