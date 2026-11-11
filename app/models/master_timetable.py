@@ -20,6 +20,7 @@ class MasterTimetable(Base):
     uploaded_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
     version = Column(Integer, default=1)
+    category = Column(String(20), server_default="undergraduate", nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
@@ -38,13 +39,15 @@ class MasterEntry(Base):
     )
     timetable_id = Column(UUID(as_uuid=True), ForeignKey("master_timetables.id", ondelete="CASCADE"), nullable=False)
     level = Column(Integer, nullable=False)
-    day = Column(Integer, nullable=False)  # 0-4 (Mon-Fri)
-    period = Column(Integer, nullable=False)  # 0-11
+    day = Column(Integer, nullable=False)  # 0-6 (Mon-Sun)
+    period = Column(Integer, nullable=False)  # grid position within the day
     subject = Column(String(50), nullable=False)
     venue_code = Column(String(50), nullable=False)
     is_free = Column(Boolean, default=False)
     department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"), nullable=True)
     course_kind = Column(String(1))  # "C" or "E" or null
+    start_time = Column(String(5), nullable=True)  # "HH:MM" for PG entries
+    end_time = Column(String(5), nullable=True)  # "HH:MM" for PG entries
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())

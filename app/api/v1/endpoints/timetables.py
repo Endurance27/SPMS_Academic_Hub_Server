@@ -27,13 +27,14 @@ router = APIRouter()
 @router.get("", response_model=TimetableListResponse)
 async def list_timetables(
     semester_id: uuid.UUID = Query(...),
+    category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db)
 ):
     """List uploaded master timetables"""
     service = MasterTimetableService(db)
-    timetables = await service.list_timetables(semester_id)
+    timetables = await service.list_timetables(semester_id, category=category)
     total = len(timetables)
     start = (page - 1) * page_size
     paged = timetables[start:start + page_size]
@@ -50,6 +51,7 @@ async def get_timetable_entries(
     venue: Optional[str] = Query(None),
     subjects: Optional[str] = Query(None),
     day: Optional[int] = Query(None),
+    category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -62,7 +64,8 @@ async def get_timetable_entries(
         level=level,
         venue_code=venue,
         subjects=subjects_list,
-        day=day
+        day=day,
+        category=category,
     )
     return TimetableEntriesResponse(data=entries, meta=meta)
 
@@ -74,6 +77,7 @@ async def get_master_only_entries(
     venue: Optional[str] = Query(None),
     subjects: Optional[str] = Query(None),
     day: Optional[int] = Query(None),
+    category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -88,6 +92,7 @@ async def get_master_only_entries(
         subjects=subjects_list,
         day=day,
         source="master",
+        category=category,
     )
     return TimetableEntriesResponse(data=entries, meta=meta)
 
@@ -100,6 +105,7 @@ async def get_department_entries(
     venue: Optional[str] = Query(None),
     subjects: Optional[str] = Query(None),
     day: Optional[int] = Query(None),
+    category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -115,6 +121,7 @@ async def get_department_entries(
         day=day,
         source="department",
         department_id=department_id,
+        category=category,
     )
     return TimetableEntriesResponse(data=entries, meta=meta)
 
@@ -129,6 +136,8 @@ async def get_timetable_template():
 400,Monday,08:30-09:20,DCIT101,JQB09
 400,Monday,09:30-10:20,FREE,JQB09
 400,Tuesday,07:30-08:20,MATH301,NNB1
+600,Monday,07:30-08:20,DCIT601,JQB12
+600,Monday,08:30-09:20,FREE,JQB12
 """
 
     return Response(
@@ -142,6 +151,7 @@ async def get_timetable_template():
 async def export_timetable(
     semester_id: uuid.UUID = Query(...),
     level: Optional[int] = Query(None),
+    category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -149,7 +159,7 @@ async def export_timetable(
     from fastapi.responses import Response
 
     service = MasterTimetableService(db)
-    csv_content = await service.export_timetable(semester_id, level)
+    csv_content = await service.export_timetable(semester_id, level, category=category)
 
     filename = f"semester-{semester_id}"
     if level:
@@ -189,6 +199,7 @@ async def get_double_bookings(
     source: Optional[str] = Query(
         None, description="Filter by source: 'master', 'department', or omit for department-only (default)"
     ),
+    category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -202,9 +213,10 @@ async def get_double_bookings(
     from sqlalchemy import func
     from app.models.master_timetable import MasterTimetable, MasterEntry
 
-    result = await db.execute(
-        select(MasterTimetable.id).where(MasterTimetable.semester_id == semester_id)
-    )
+    tt_query = select(MasterTimetable.id).where(MasterTimetable.semester_id == semester_id)
+    if category:
+        tt_query = tt_query.where(MasterTimetable.category == category)
+    result = await db.execute(tt_query)
     timetable_ids = [row[0] for row in result.all()]
     if not timetable_ids:
         return {"data": []}
@@ -274,7 +286,7 @@ async def delete_timetable(
 async def preview_timetable(
     file: UploadFile = File(...),
     semester_id: uuid.UUID = Query(...),
-    level: Optional[int] = Query(None, description="Level to parse (100-400). Omit to parse all levels."),
+    level: Optional[int] = Query(None, description="Level to parse (e.g. 100-400 for UG, 500+ for PG). Omit to parse all levels."),
     current_user: User = Depends(require_permission("timetable.upload")),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),

@@ -27,12 +27,15 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         )
         return result.scalar_one_or_none()
 
-    async def list_by_semester(self, semester_id: uuid.UUID) -> List[MasterTimetable]:
-        result = await self.db.execute(
-            select(MasterTimetable).where(
-                MasterTimetable.semester_id == semester_id
-            ).order_by(MasterTimetable.level)
+    async def list_by_semester(
+        self, semester_id: uuid.UUID, category: Optional[str] = None
+    ) -> List[MasterTimetable]:
+        query = select(MasterTimetable).where(
+            MasterTimetable.semester_id == semester_id
         )
+        if category:
+            query = query.where(MasterTimetable.category == category)
+        result = await self.db.execute(query.order_by(MasterTimetable.level))
         return list(result.scalars().all())
 
     async def count_entries(self, timetable_id: uuid.UUID) -> int:
@@ -63,12 +66,16 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         day: Optional[int] = None,
         source: Optional[str] = None,
         department_id: Optional[uuid.UUID] = None,
+        category: Optional[str] = None,
     ) -> List[MasterEntry]:
         query = (
             select(MasterEntry)
             .join(MasterTimetable, MasterEntry.timetable_id == MasterTimetable.id)
             .where(MasterTimetable.semester_id == semester_id)
         )
+
+        if category is not None:
+            query = query.where(MasterTimetable.category == category)
 
         if source == "master":
             query = query.where(MasterEntry.department_id.is_(None))

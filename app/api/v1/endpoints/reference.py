@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.models.programme import Programme
 from app.models.semester import Semester
 from app.models.settings import InstitutionSettings
 from app.models.user import User
@@ -10,7 +11,7 @@ from app.models.user import User
 router = APIRouter()
 
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-LEVELS = [100, 200, 300, 400]
+ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 PERIODS = [
     {
@@ -21,6 +22,23 @@ PERIODS = [
     }
     for i in range(12)
 ]
+
+_PG_WEEKDAY_SLOTS = [
+    {"index": 0, "start": "17:30", "end": "19:30", "label": "17:30 – 19:30"},
+    {"index": 1, "start": "19:30", "end": "21:30", "label": "19:30 – 21:30"},
+]
+_PG_WEEKEND_SLOTS = [
+    {"index": 0, "start": "07:30", "end": "09:30", "label": "07:30 – 09:30"},
+    {"index": 1, "start": "09:30", "end": "11:30", "label": "09:30 – 11:30"},
+    {"index": 2, "start": "11:30", "end": "13:30", "label": "11:30 – 13:30"},
+    {"index": 3, "start": "14:00", "end": "16:00", "label": "14:00 – 16:00"},
+    {"index": 4, "start": "16:00", "end": "18:00", "label": "16:00 – 18:00"},
+    {"index": 5, "start": "18:00", "end": "20:00", "label": "18:00 – 20:00"},
+]
+PG_PERIODS = {
+    "weekday": _PG_WEEKDAY_SLOTS,
+    "weekend": _PG_WEEKEND_SLOTS,
+}
 
 
 @router.get("")
@@ -33,6 +51,11 @@ async def get_reference_data(
     )
     semesters = result.scalars().all()
 
+    levels_result = await db.execute(
+        select(func.unnest(Programme.levels)).distinct()
+    )
+    levels = sorted(row[0] for row in levels_result.all() if row[0] is not None)
+
     settings_result = await db.execute(select(InstitutionSettings).limit(1))
     settings = settings_result.scalar_one_or_none()
     current_semester_id = str(settings.active_semester_id) if settings and settings.active_semester_id else None
@@ -40,8 +63,10 @@ async def get_reference_data(
     return {
         "data": {
             "weekdays": WEEKDAYS,
+            "days": ALL_DAYS,
             "periods": PERIODS,
-            "levels": LEVELS,
+            "pgPeriods": PG_PERIODS,
+            "levels": levels,
             "currentSemesterId": current_semester_id,
             "semesters": [
                 {
