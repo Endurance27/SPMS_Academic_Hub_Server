@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 SKIP_VENUE_CODES = {"DEPT", "ONLINE", "FREE", "TBA", "TBD", "N/A", ""}
 
-DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
 def _extract_subject_prefix(subject: str) -> str:
@@ -134,9 +134,9 @@ class MasterTimetableService:
             raise ValueError("Timetable preview was not found or has expired")
         return json.loads(raw_data)
 
-    async def list_timetables(self, semester_id: uuid.UUID) -> List[Dict]:
+    async def list_timetables(self, semester_id: uuid.UUID, category: Optional[str] = None) -> List[Dict]:
         """List all master timetables for a semester"""
-        timetables = await self.repo.list_by_semester(semester_id)
+        timetables = await self.repo.list_by_semester(semester_id, category=category)
 
         result = []
         for tt in timetables:
@@ -147,6 +147,7 @@ class MasterTimetableService:
                 "id": str(tt.id),
                 "semester_id": str(tt.semester_id),
                 "level": tt.level,
+                "category": tt.category,
                 "filename": tt.filename,
                 "uploaded_by_id": str(tt.uploaded_by_id),
                 "uploaded_at": tt.uploaded_at.isoformat() if tt.uploaded_at else None,
@@ -196,7 +197,13 @@ class MasterTimetableService:
 
         entries = []
         for entry in all_entries:
-            period_start_hour = 7 + entry.period
+            if entry.start_time and entry.end_time:
+                period_start = entry.start_time
+                period_end = entry.end_time
+            else:
+                period_start_hour = 7 + entry.period
+                period_start = f"{period_start_hour:02d}:30"
+                period_end = f"{period_start_hour + 1:02d}:20"
             key = (entry.venue_code, entry.day, entry.period)
             clashing = double_booked_slots.get(key)
             entries.append({
@@ -207,8 +214,8 @@ class MasterTimetableService:
                 "day": entry.day,
                 "day_name": DAY_NAMES[entry.day] if 0 <= entry.day < len(DAY_NAMES) else None,
                 "period": entry.period,
-                "period_start": f"{period_start_hour:02d}:30",
-                "period_end": f"{period_start_hour + 1:02d}:20",
+                "period_start": period_start,
+                "period_end": period_end,
                 "venue_code": entry.venue_code,
                 "is_free": entry.is_free,
                 "department_id": str(entry.department_id) if entry.department_id else None,
@@ -233,6 +240,7 @@ class MasterTimetableService:
             "id": str(timetable.id),
             "semester_id": str(timetable.semester_id),
             "level": timetable.level,
+            "category": timetable.category,
             "filename": timetable.filename,
             "uploaded_by_id": str(timetable.uploaded_by_id),
             "uploaded_at": timetable.uploaded_at.isoformat() if timetable.uploaded_at else None,
@@ -268,6 +276,7 @@ class MasterTimetableService:
         day: Optional[int] = None,
         source: Optional[str] = None,
         department_id: Optional[uuid.UUID] = None,
+        category: Optional[str] = None,
     ) -> tuple[List[Dict], Dict]:
         """Get timetable entries with filtering.
 
@@ -283,6 +292,7 @@ class MasterTimetableService:
                 semester_id=semester_id,
                 level=level,
                 day=day,
+                category=category,
             )
             entries = _merge_entries(all_entries)
 
@@ -299,20 +309,24 @@ class MasterTimetableService:
                 day=day,
                 source=source,
                 department_id=department_id,
+                category=category,
             )
 
         meta = {}
         if level is None:
             if do_merge:
-                for lvl in [100, 200, 300, 400]:
+                distinct_levels = sorted({e.level for e in entries})
+                for lvl in distinct_levels:
                     lvl_entries = [e for e in entries if e.level == lvl]
                     meta[f"level_{lvl}_count"] = len(lvl_entries)
                     meta[f"level_{lvl}_free"] = sum(1 for e in lvl_entries if e.is_free)
             else:
-                for lvl in [100, 200, 300, 400]:
-                    level_entries = await self.repo.get_entries(
-                        semester_id, level=lvl, source=source, department_id=department_id,
-                    )
+                all_entries = await self.repo.get_entries(
+                    semester_id, source=source, department_id=department_id, category=category,
+                )
+                distinct_levels = sorted({e.level for e in all_entries})
+                for lvl in distinct_levels:
+                    level_entries = [e for e in all_entries if e.level == lvl]
                     meta[f"level_{lvl}_count"] = len(level_entries)
                     meta[f"level_{lvl}_free"] = sum(1 for e in level_entries if e.is_free)
 
@@ -321,7 +335,13 @@ class MasterTimetableService:
 
         result = []
         for entry in entries:
-            period_start_hour = 7 + entry.period
+            if entry.start_time and entry.end_time:
+                period_start = entry.start_time
+                period_end = entry.end_time
+            else:
+                period_start_hour = 7 + entry.period
+                period_start = f"{period_start_hour:02d}:30"
+                period_end = f"{period_start_hour + 1:02d}:20"
             result.append({
                 "id": str(entry.id),
                 "timetable_id": str(entry.timetable_id),
@@ -329,8 +349,8 @@ class MasterTimetableService:
                 "day": entry.day,
                 "day_name": DAY_NAMES[entry.day] if 0 <= entry.day < len(DAY_NAMES) else None,
                 "period": entry.period,
-                "period_start": f"{period_start_hour:02d}:30",
-                "period_end": f"{period_start_hour + 1:02d}:20",
+                "period_start": period_start,
+                "period_end": period_end,
                 "subject": entry.subject,
                 "venue_code": entry.venue_code,
                 "is_free": entry.is_free,
@@ -362,6 +382,8 @@ class MasterTimetableService:
         parser = TimetableParser()
         parse_result = parser.parse_file(content, file_type, level, str(semester_id))
 
+        category = parse_result.get("category", "undergraduate")
+
         preview_id = str(uuid.uuid4())
         preview_data = {
             "entries": parse_result["entries"],
@@ -369,7 +391,8 @@ class MasterTimetableService:
             "summary": parse_result["summary"],
             "semester_id": str(semester_id),
             "level": level,
-            "filename": filename
+            "filename": filename,
+            "category": category,
         }
         await self._store_preview(preview_id, preview_data)
 
@@ -403,6 +426,7 @@ class MasterTimetableService:
         """Persist the uploaded master timetable and its parsed entries."""
         preview_data = await self._load_preview(preview_id)
         semester_id = uuid.UUID(preview_data["semester_id"])
+        category = preview_data.get("category", "undergraduate")
         entries_by_level: Dict[int, List[Dict[str, Any]]] = {}
         for entry in preview_data.get("entries", []):
             entry_level = int(entry.get("level") or preview_data.get("level") or 0)
@@ -422,6 +446,7 @@ class MasterTimetableService:
                 timetable.version = (timetable.version or 1) + 1
                 timetable.filename = preview_data["filename"]
                 timetable.uploaded_by_id = uploaded_by_id
+                timetable.category = category
                 await self.db.execute(
                     delete(MasterEntry).where(
                         MasterEntry.timetable_id == timetable.id,
@@ -435,6 +460,7 @@ class MasterTimetableService:
                     filename=preview_data["filename"],
                     uploaded_by_id=uploaded_by_id,
                     version=1,
+                    category=category,
                 )
                 self.db.add(timetable)
                 await self.db.flush()
@@ -450,6 +476,8 @@ class MasterTimetableService:
                     is_free=bool(entry.get("is_free", False)),
                     department_id=entry.get("department_id"),
                     course_kind=entry.get("course_kind"),
+                    start_time=entry.get("start_time"),
+                    end_time=entry.get("end_time"),
                 )
                 for entry in level_entries
             ])
@@ -460,6 +488,7 @@ class MasterTimetableService:
                 uploaded_by_id=uploaded_by_id,
                 entry_count=len(level_entries),
                 kind="master",
+                category=category,
             ))
 
         venue_codes = {
@@ -508,11 +537,14 @@ class MasterTimetableService:
 
         preview_id = str(uuid.uuid4())
 
+        category = parse_result.get("category", "undergraduate")
+
         preview_data = {
             "entries": filtered_entries,
             "semester_id": str(semester_id),
             "department_id": str(department_id),
             "filename": filename,
+            "category": category,
         }
         await self._store_preview(preview_id, preview_data)
 
@@ -542,6 +574,7 @@ class MasterTimetableService:
         preview_data = await self._load_preview(preview_id)
         semester_id = uuid.UUID(preview_data["semester_id"])
         department_id = uuid.UUID(preview_data["department_id"])
+        category = preview_data.get("category", "undergraduate")
         entries = preview_data.get("entries", [])
         if not entries:
             raise ValueError("Cannot publish a department timetable with no entries")
@@ -579,6 +612,7 @@ class MasterTimetableService:
                     filename=preview_data["filename"],
                     uploaded_by_id=uploaded_by_id,
                     version=1,
+                    category=category,
                 )
                 self.db.add(timetable)
                 await self.db.flush()
@@ -593,6 +627,8 @@ class MasterTimetableService:
                     is_free=bool(entry.get("is_free", False)),
                     department_id=department_id,
                     course_kind=entry.get("course_kind"),
+                    start_time=entry.get("start_time"),
+                    end_time=entry.get("end_time"),
                 )
                 for entry in level_entries
             ])
@@ -603,6 +639,7 @@ class MasterTimetableService:
                 uploaded_by_id=uploaded_by_id,
                 entry_count=len(level_entries),
                 kind="department",
+                category=category,
                 department_id=department_id,
             ))
 
@@ -615,19 +652,15 @@ class MasterTimetableService:
     async def export_timetable(
         self,
         semester_id: uuid.UUID,
-        level: Optional[int] = None
+        level: Optional[int] = None,
+        category: Optional[str] = None,
     ) -> str:
         """Export timetable as CSV"""
-        entries, _ = await self.get_entries(semester_id, level)
+        entries, _ = await self.get_entries(semester_id, level, category=category)
 
         lines = ["Level,Day,Time,Subject,Venue"]
         for entry in entries:
-            # Calculate time label from period
-            period = entry["period"]
-            start = f"{7 + period:02d}:30"
-            end = f"{8 + period:02d}:20"
-            time = f"{start}-{end}"
-
+            time = f"{entry['period_start']}-{entry['period_end']}"
             lines.append(f"{entry['level']},{entry['day']},{time},{entry['subject']},{entry['venue_code']}")
 
         return "\n".join(lines)
@@ -642,6 +675,7 @@ class MasterTimetableService:
                 "id": str(upload.id),
                 "semester_id": str(upload.semester_id),
                 "level": upload.level,
+                "category": upload.category,
                 "filename": upload.filename,
                 "uploaded_by_id": str(upload.uploaded_by_id),
                 "uploaded_at": upload.uploaded_at.isoformat() if upload.uploaded_at else None,
@@ -732,7 +766,7 @@ class MasterTimetableService:
                 continue
 
             master_subjects = [m["subject"] for m in masters_at_slot]
-            day_name = DAY_NAMES[entry["day"]] if 0 <= entry["day"] < 5 else f"Day {entry['day']}"
+            day_name = DAY_NAMES[entry["day"]] if 0 <= entry["day"] < len(DAY_NAMES) else f"Day {entry['day']}"
             warnings.append({
                 "type": "master_mismatch",
                 "severity": "error",
