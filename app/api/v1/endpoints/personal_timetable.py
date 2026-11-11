@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.models.user import User, UserRole
-from app.schemas.timetable_personal import PersonalMasterTimetableResponse
+from app.schemas.timetable_personal import MasterEntryDetailResponse, PersonalMasterTimetableResponse
 from app.services.personal_timetable_service import PersonalTimetableService
 
 router = APIRouter()
@@ -87,3 +87,26 @@ async def export_personal_master_timetable(
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="my-master-timetable.csv"'},
     )
+
+
+@router.get("/master/{entry_id}", response_model=MasterEntryDetailResponse)
+async def get_timetable_entry_detail(
+    entry_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role not in (UserRole.STUDENT, UserRole.SUPER):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
+    service = PersonalTimetableService(db)
+    data = await service.get_entry_detail(entry_id=entry_id)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Timetable entry not found",
+        )
+
+    return MasterEntryDetailResponse(**data)

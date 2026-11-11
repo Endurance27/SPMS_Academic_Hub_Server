@@ -1,23 +1,23 @@
 # SPMS Academic Hub Server -- API Endpoints Reference
 
-> **Version:** 1.0  
-> **Generated:** 2026-10-26  
+> **Version:** 1.1  
+> **Generated:** 2026-11-11  
 > **Base URL:** `/api/{version}` (currently `/api/v1.0.0`, configured via `API_VERSION` env var)
 
 ---
 
 ## Architectural Overview
 
-| Concern | Detail |
-|---------|--------|
-| **Base URL** | All routes are served under `/api/v1.0.0` (configurable via `API_VERSION` env var). |
-| **Authentication** | Bearer token (JWT) in the `Authorization` header. Obtain tokens via `/api/v1/auth/login`. |
-| **Authorization** | Role-Based Access Control (RBAC). Each endpoint declares a required permission via `require_permission("...")`. Super admins implicitly hold every permission. |
-| **Pagination** | Standard list responses accept `page` (1-based) and `page_size` query parameters. Responses include a `meta` object with pagination info. Some admin endpoints use `skip`/`limit` or `per_page`/`page`. |
-| **Entity IDs** | All entity IDs are UUIDs (v4). |
-| **Dates** | ISO 8601 format (`YYYY-MM-DDTHH:MM:SS`). |
-| **Error format** | `{"detail": "..."}` with appropriate HTTP status code. |
-| **User Roles** | `super`, `department`, `lecturer`, `student` |
+| Concern            | Detail                                                                                                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Base URL**       | All routes are served under `/api/v1.0.0` (configurable via `API_VERSION` env var).                                                                                                                     |
+| **Authentication** | Bearer token (JWT) in the `Authorization` header. Obtain tokens via `/api/v1/auth/login`.                                                                                                               |
+| **Authorization**  | Role-Based Access Control (RBAC). Each endpoint declares a required permission via `require_permission("...")`. Super admins implicitly hold every permission.                                          |
+| **Pagination**     | Standard list responses accept `page` (1-based) and `page_size` query parameters. Responses include a `meta` object with pagination info. Some admin endpoints use `skip`/`limit` or `per_page`/`page`. |
+| **Entity IDs**     | All entity IDs are UUIDs (v4).                                                                                                                                                                          |
+| **Dates**          | ISO 8601 format (`YYYY-MM-DDTHH:MM:SS`).                                                                                                                                                                |
+| **Error format**   | `{"detail": "..."}` with appropriate HTTP status code.                                                                                                                                                  |
+| **User Roles**     | `super`, `department`, `lecturer`, `student`                                                                                                                                                            |
 
 ---
 
@@ -71,20 +71,20 @@ Login endpoint. Returns access and refresh tokens.
 - **Permission:** Public (no auth required)
 - **Request Body** (`LoginRequest`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `email` | EmailStr | Yes | |
-| `password` | string | Yes | |
+| Field      | Type     | Required | Notes |
+| ---------- | -------- | -------- | ----- |
+| `email`    | EmailStr | Yes      |       |
+| `password` | string   | Yes      |       |
 
 - **Response** (`LoginResponse`):
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `access_token` | string | JWT access token |
-| `refresh_token` | string | JWT refresh token |
-| `token_type` | string | Always `"bearer"` |
-| `requires_2fa` | boolean | `true` if 2FA verification needed |
-| `is_first_time` | boolean | `true` on first login |
+| Field           | Type    | Notes                             |
+| --------------- | ------- | --------------------------------- |
+| `access_token`  | string  | JWT access token                  |
+| `refresh_token` | string  | JWT refresh token                 |
+| `token_type`    | string  | Always `"bearer"`                 |
+| `requires_2fa`  | boolean | `true` if 2FA verification needed |
+| `is_first_time` | boolean | `true` on first login             |
 
 ---
 
@@ -95,14 +95,14 @@ Student self-registration. Creates a new student account.
 - **Permission:** Public (no auth required)
 - **Request Body** (`RegisterRequest`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `email` | EmailStr | Yes | |
-| `password` | string | Yes | min_length=6 |
-| `name` | string | Yes | min_length=1, max_length=255 |
-| `student_number` | string | Yes | min_length=1, max_length=50 |
-| `programme_id` | UUID | Yes | |
-| `level` | int | Yes | 100-900 |
+| Field            | Type     | Required | Notes                        |
+| ---------------- | -------- | -------- | ---------------------------- |
+| `email`          | EmailStr | Yes      |                              |
+| `password`       | string   | Yes      | min_length=6                 |
+| `name`           | string   | Yes      | min_length=1, max_length=255 |
+| `student_number` | string   | Yes      | min_length=1, max_length=50  |
+| `programme_id`   | UUID     | Yes      |                              |
+| `level`          | int      | Yes      | 100-900                      |
 
 - **Response** (`LoginResponse`): Same as login response.
 - **Status:** 201 Created
@@ -116,9 +116,9 @@ Rotate refresh token and issue new access token.
 - **Permission:** Public (no auth required)
 - **Request Body** (`RefreshTokenRequest`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `refresh_token` | string | Yes |
+| Field           | Type   | Required |
+| --------------- | ------ | -------- |
+| `refresh_token` | string | Yes      |
 
 - **Response** (`LoginResponse`): Same as login response.
 
@@ -131,30 +131,30 @@ Get current user profile with permissions and related data.
 - **Permission:** Authenticated user
 - **Response** (`UserMeResponse`):
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | UUID | |
-| `email` | string | |
-| `name` | string | |
-| `role` | string | `super`, `department`, `lecturer`, `student` |
-| `status` | string | |
-| `department_id` | UUID? | |
-| `programme_id` | UUID? | |
-| `level` | int? | |
-| `student_category` | string? | |
-| `student_number` | string? | |
-| `staff_id` | string? | |
-| `rank` | string? | |
-| `phone` | string? | |
-| `office` | string? | |
-| `photo_url` | string? | |
-| `title` | string? | |
-| `two_factor_enabled` | boolean | |
-| `last_login_at` | datetime? | |
-| `created_at` | datetime? | |
-| `department` | object? | `{id, name, code}` |
-| `programme` | object? | `{id, name, code}` |
-| `permissions` | string[] | List of permission codes |
+| Field                | Type      | Notes                                        |
+| -------------------- | --------- | -------------------------------------------- |
+| `id`                 | UUID      |                                              |
+| `email`              | string    |                                              |
+| `name`               | string    |                                              |
+| `role`               | string    | `super`, `department`, `lecturer`, `student` |
+| `status`             | string    |                                              |
+| `department_id`      | UUID?     |                                              |
+| `programme_id`       | UUID?     |                                              |
+| `level`              | int?      |                                              |
+| `student_category`   | string?   |                                              |
+| `student_number`     | string?   |                                              |
+| `staff_id`           | string?   |                                              |
+| `rank`               | string?   |                                              |
+| `phone`              | string?   |                                              |
+| `office`             | string?   |                                              |
+| `photo_url`          | string?   |                                              |
+| `title`              | string?   |                                              |
+| `two_factor_enabled` | boolean   |                                              |
+| `last_login_at`      | datetime? |                                              |
+| `created_at`         | datetime? |                                              |
+| `department`         | object?   | `{id, name, code}`                           |
+| `programme`          | object?   | `{id, name, code}`                           |
+| `permissions`        | string[]  | List of permission codes                     |
 
 ---
 
@@ -175,9 +175,9 @@ Verify 2FA code and complete login.
 - **Permission:** Authenticated user (pending 2FA)
 - **Request Body** (`TwoFactorVerifyRequest`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `code` | string | Yes |
+| Field  | Type   | Required |
+| ------ | ------ | -------- |
+| `code` | string | Yes      |
 
 - **Response** (`LoginResponse`): Same as login response.
 
@@ -190,10 +190,10 @@ Setup TOTP 2FA for current user.
 - **Permission:** Authenticated user
 - **Response** (`TwoFactorSetupResponse`):
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `secret` | string | TOTP secret key |
-| `qr_code` | string | QR code data URL |
+| Field          | Type     | Notes                 |
+| -------------- | -------- | --------------------- |
+| `secret`       | string   | TOTP secret key       |
+| `qr_code`      | string   | QR code data URL      |
 | `backup_codes` | string[] | One-time backup codes |
 
 ---
@@ -223,11 +223,11 @@ Accept an invitation and activate the account.
 - **Permission:** Public (no auth required)
 - **Request Body** (`AcceptInvitationRequest`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `token` | string | Yes | Invitation token |
-| `password` | string | Yes | min_length=8 |
-| `name` | string? | No | Override display name |
+| Field      | Type    | Required | Notes                 |
+| ---------- | ------- | -------- | --------------------- |
+| `token`    | string  | Yes      | Invitation token      |
+| `password` | string  | Yes      | min_length=8          |
+| `name`     | string? | No       | Override display name |
 
 - **Response** (`LoginResponse`): Same as login response.
 
@@ -240,17 +240,17 @@ Get invitation details for the activation screen.
 - **Permission:** Public (no auth required)
 - **Path Parameters:**
 
-| Param | Type |
-|-------|------|
+| Param   | Type   |
+| ------- | ------ |
 | `token` | string |
 
 - **Response** (`InvitationInfoResponse`):
 
-| Field | Type |
-|-------|------|
+| Field   | Type   |
+| ------- | ------ |
 | `email` | string |
-| `name` | string |
-| `role` | string |
+| `name`  | string |
+| `role`  | string |
 
 ---
 
@@ -265,9 +265,9 @@ Initiate password reset -- sends a 6-digit code to email.
 - **Permission:** Public (no auth required)
 - **Request Body** (`ForgotPasswordRequest`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `email` | EmailStr | Yes |
+| Field   | Type     | Required |
+| ------- | -------- | -------- |
+| `email` | EmailStr | Yes      |
 
 - **Response:** `{"message": "If the email exists, a reset code has been sent", "expires_in_minutes": 15}`
 
@@ -280,10 +280,10 @@ Verify the 6-digit code and return a reset token.
 - **Permission:** Public (no auth required)
 - **Request Body** (`ForgotPasswordVerifyCode`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `email` | EmailStr | Yes | |
-| `code` | string | Yes | Exactly 6 characters |
+| Field   | Type     | Required | Notes                |
+| ------- | -------- | -------- | -------------------- |
+| `email` | EmailStr | Yes      |                      |
+| `code`  | string   | Yes      | Exactly 6 characters |
 
 - **Response:** `{"token": "...", "message": "Code verified successfully"}`
 
@@ -296,10 +296,10 @@ Reset password using token from verified code.
 - **Permission:** Public (no auth required)
 - **Request Body** (`ResetPasswordRequest`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `token` | string | Yes | |
-| `new_password` | string | Yes | min 8 chars, must contain upper+lower+digit |
+| Field          | Type   | Required | Notes                                       |
+| -------------- | ------ | -------- | ------------------------------------------- |
+| `token`        | string | Yes      |                                             |
+| `new_password` | string | Yes      | min 8 chars, must contain upper+lower+digit |
 
 - **Response:** `{"message": "Password reset successfully..."}`
 
@@ -312,10 +312,10 @@ Change password (requires old password). User must be authenticated.
 - **Permission:** Authenticated user
 - **Request Body** (`ChangePasswordRequest`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `old_password` | string | Yes | |
-| `new_password` | string | Yes | min 8 chars, must contain upper+lower+digit |
+| Field          | Type   | Required | Notes                                       |
+| -------------- | ------ | -------- | ------------------------------------------- |
+| `old_password` | string | Yes      |                                             |
+| `new_password` | string | Yes      | min 8 chars, must contain upper+lower+digit |
 
 - **Response:** `{"message": "Password changed successfully"}`
 
@@ -332,16 +332,16 @@ Get current user profile.
 - **Permission:** Authenticated user
 - **Response** (`ProfileResponse`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `email` | string |
-| `name` | string |
-| `role` | string |
-| `phone` | string? |
-| `office` | string? |
+| Field       | Type    |
+| ----------- | ------- |
+| `id`        | UUID    |
+| `email`     | string  |
+| `name`      | string  |
+| `role`      | string  |
+| `phone`     | string? |
+| `office`    | string? |
 | `photo_url` | string? |
-| `title` | string? |
+| `title`     | string? |
 
 ---
 
@@ -352,11 +352,11 @@ Update current user profile.
 - **Permission:** Authenticated user
 - **Request Body** (`ProfileUpdateRequest`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string? | No | min 1, max 255 |
-| `phone` | string? | No | max 20 |
-| `office` | string? | No | max 100 |
+| Field    | Type    | Required | Notes          |
+| -------- | ------- | -------- | -------------- |
+| `name`   | string? | No       | min 1, max 255 |
+| `phone`  | string? | No       | max 20         |
+| `office` | string? | No       | max 100        |
 
 - **Response** (`ProfileResponse`): Same as GET profile.
 
@@ -388,11 +388,11 @@ Change password.
 - **Permission:** Authenticated user
 - **Request Body** (`PasswordChangeRequest`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `current_password` | string | Yes |
-| `new_password` | string | Yes (min 8 chars) |
-| `confirm_password` | string | Yes |
+| Field              | Type   | Required          |
+| ------------------ | ------ | ----------------- |
+| `current_password` | string | Yes               |
+| `new_password`     | string | Yes (min 8 chars) |
+| `confirm_password` | string | Yes               |
 
 - **Response:** `{"message": "Password changed successfully."}`
 
@@ -405,21 +405,21 @@ List active sessions for the current user.
 - **Permission:** Authenticated user
 - **Response** (`SessionListResponse`):
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `data` | SessionResponse[] | |
+| Field  | Type              | Notes |
+| ------ | ----------------- | ----- |
+| `data` | SessionResponse[] |       |
 
 `SessionResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `user_agent` | string? |
-| `ip_address` | string? |
-| `location` | string? |
-| `created_at` | datetime? |
+| Field          | Type      |
+| -------------- | --------- |
+| `id`           | UUID      |
+| `user_agent`   | string?   |
+| `ip_address`   | string?   |
+| `location`     | string?   |
+| `created_at`   | datetime? |
 | `last_seen_at` | datetime? |
-| `is_current` | boolean |
+| `is_current`   | boolean   |
 
 ---
 
@@ -449,14 +449,14 @@ Get notification preferences.
 - **Permission:** Authenticated user
 - **Response** (`NotificationPreferencesResponse`):
 
-| Field | Type | Default |
-|-------|------|---------|
-| `schedule_notifications` | boolean | true |
-| `assessment_notifications` | boolean | true |
-| `attendance_notifications` | boolean | true |
-| `graduation_notifications` | boolean | true |
-| `email_notifications` | boolean | true |
-| `in_app_notifications` | boolean | true |
+| Field                      | Type    | Default |
+| -------------------------- | ------- | ------- |
+| `schedule_notifications`   | boolean | true    |
+| `assessment_notifications` | boolean | true    |
+| `attendance_notifications` | boolean | true    |
+| `graduation_notifications` | boolean | true    |
+| `email_notifications`      | boolean | true    |
+| `in_app_notifications`     | boolean | true    |
 
 ---
 
@@ -481,17 +481,17 @@ Get current user info.
 - **Permission:** Authenticated user
 - **Response** (`UserResponse`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `email` | string |
-| `first_name` | string |
-| `last_name` | string |
-| `phone_number` | string? |
-| `role` | UserRole |
-| `is_active` | boolean |
-| `two_factor_enabled` | boolean |
-| `last_login` | datetime? |
+| Field                | Type      |
+| -------------------- | --------- |
+| `id`                 | UUID      |
+| `email`              | string    |
+| `first_name`         | string    |
+| `last_name`          | string    |
+| `phone_number`       | string?   |
+| `role`               | UserRole  |
+| `is_active`          | boolean   |
+| `two_factor_enabled` | boolean   |
+| `last_login`         | datetime? |
 
 ---
 
@@ -502,11 +502,11 @@ Update user info.
 - **Permission:** Authenticated user
 - **Request Body** (`UserProfileUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `first_name` | string? | No |
-| `last_name` | string? | No |
-| `phone_number` | string? | No |
+| Field          | Type    | Required |
+| -------------- | ------- | -------- |
+| `first_name`   | string? | No       |
+| `last_name`    | string? | No       |
+| `phone_number` | string? | No       |
 
 - **Response** (`UserResponse`): Same as above.
 
@@ -523,22 +523,22 @@ Get all users with filtering and pagination.
 - **Permission:** `users.manage`
 - **Query Parameters:**
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `per_page` | int | 20 | |
-| `page` | int | 1 | |
-| `name` | string? | null | Filter by name |
-| `role` | UserRole? | null | Filter by role |
-| `is_active` | boolean? | null | Filter by active status |
-| `last_login` | datetime? | null | Filter by last login |
-| `phone_number` | string? | null | Filter by phone |
-| `email` | string? | null | Filter by email |
+| Param          | Type      | Default | Notes                   |
+| -------------- | --------- | ------- | ----------------------- |
+| `per_page`     | int       | 20      |                         |
+| `page`         | int       | 1       |                         |
+| `name`         | string?   | null    | Filter by name          |
+| `role`         | UserRole? | null    | Filter by role          |
+| `is_active`    | boolean?  | null    | Filter by active status |
+| `last_login`   | datetime? | null    | Filter by last login    |
+| `phone_number` | string?   | null    | Filter by phone         |
+| `email`        | string?   | null    | Filter by email         |
 
 - **Response** (`UsersListResponse`):
 
-| Field | Type |
-|-------|------|
-| `items` | UserResponse[] |
+| Field        | Type                                                       |
+| ------------ | ---------------------------------------------------------- |
+| `items`      | UserResponse[]                                             |
 | `pagination` | `{total, page, per_page, total_pages, has_next, has_prev}` |
 
 ---
@@ -561,9 +561,9 @@ Update user status (activate/deactivate).
 - **Path Parameters:** `user_id` (UUID)
 - **Request Body** (`UserStatusUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `is_active` | boolean? | No |
+| Field       | Type     | Required |
+| ----------- | -------- | -------- |
+| `is_active` | boolean? | No       |
 
 - **Response** (`UserResponse`)
 
@@ -577,9 +577,9 @@ Update a user's role.
 - **Path Parameters:** `user_id` (UUID)
 - **Request Body** (`UserRoleUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `role` | UserRole? | No |
+| Field  | Type      | Required |
+| ------ | --------- | -------- |
+| `role` | UserRole? | No       |
 
 - **Response** (`UserResponse`)
 
@@ -592,10 +592,10 @@ Get audit logs (admin).
 - **Permission:** `audit.view`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `skip` | int | 0 |
-| `limit` | int | 100 |
+| Param   | Type | Default |
+| ------- | ---- | ------- |
+| `skip`  | int  | 0       |
+| `limit` | int  | 100     |
 
 - **Response:** Array of audit log objects.
 
@@ -612,27 +612,27 @@ Create a new role.
 - **Permission:** `roles.manage`
 - **Request Body** (`RoleCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string | Yes | |
-| `code` | string | Yes | |
-| `description` | string? | No | |
-| `is_admin_role` | boolean | No | default false |
-| `permission_ids` | UUID[] | No | default [] |
+| Field            | Type    | Required | Notes         |
+| ---------------- | ------- | -------- | ------------- |
+| `name`           | string  | Yes      |               |
+| `code`           | string  | Yes      |               |
+| `description`    | string? | No       |               |
+| `is_admin_role`  | boolean | No       | default false |
+| `permission_ids` | UUID[]  | No       | default []    |
 
 - **Response** (`RoleResponse`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `name` | string |
-| `code` | string |
-| `description` | string? |
-| `is_admin_role` | boolean |
-| `is_system_role` | boolean |
-| `is_active` | boolean |
-| `created_at` | datetime |
-| `permissions` | PermissionResponse[] |
+| Field            | Type                 |
+| ---------------- | -------------------- |
+| `id`             | UUID                 |
+| `name`           | string               |
+| `code`           | string               |
+| `description`    | string?              |
+| `is_admin_role`  | boolean              |
+| `is_system_role` | boolean              |
+| `is_active`      | boolean              |
+| `created_at`     | datetime             |
+| `permissions`    | PermissionResponse[] |
 
 - **Status:** 201 Created
 
@@ -665,12 +665,12 @@ Update role.
 - **Path Parameters:** `role_id` (UUID)
 - **Request Body** (`RoleUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `name` | string? | No |
-| `description` | string? | No |
-| `permission_ids` | UUID[]? | No |
-| `is_active` | boolean? | No |
+| Field            | Type     | Required |
+| ---------------- | -------- | -------- |
+| `name`           | string?  | No       |
+| `description`    | string?  | No       |
+| `permission_ids` | UUID[]?  | No       |
+| `is_active`      | boolean? | No       |
 
 - **Response** (`RoleResponse`)
 
@@ -693,15 +693,15 @@ List all available permissions.
 - **Permission:** `roles.manage`
 - **Response** (`PermissionResponse[]`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `name` | string |
-| `code` | string |
-| `description` | string? |
-| `module` | string |
-| `is_active` | boolean |
-| `created_at` | datetime |
+| Field         | Type     |
+| ------------- | -------- |
+| `id`          | UUID     |
+| `name`        | string   |
+| `code`        | string   |
+| `description` | string?  |
+| `module`      | string   |
+| `is_active`   | boolean  |
+| `created_at`  | datetime |
 
 ---
 
@@ -716,28 +716,28 @@ List all role templates.
 - **Permission:** `roles.manage`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param       | Type | Default      |
+| ----------- | ---- | ------------ |
+| `page`      | int  | 1            |
+| `page_size` | int  | 25 (max 100) |
 
 - **Response** (`RoleTemplateListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                   |
+| ------ | ---------------------- |
 | `data` | RoleTemplateResponse[] |
-| `meta` | `{page, page_size}` |
+| `meta` | `{page, page_size}`    |
 
 `RoleTemplateResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `name` | string |
-| `role` | string |
-| `permissions` | string[] |
-| `created_at` | datetime? |
-| `updated_at` | datetime? |
+| Field         | Type      |
+| ------------- | --------- |
+| `id`          | UUID      |
+| `name`        | string    |
+| `role`        | string    |
+| `permissions` | string[]  |
+| `created_at`  | datetime? |
+| `updated_at`  | datetime? |
 
 ---
 
@@ -748,11 +748,11 @@ Create a role template.
 - **Permission:** `roles.manage`
 - **Request Body** (`RoleTemplateCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string | Yes | max 255 |
-| `role` | string | Yes | max 20 |
-| `permissions` | string[] | No | default [] |
+| Field         | Type     | Required | Notes      |
+| ------------- | -------- | -------- | ---------- |
+| `name`        | string   | Yes      | max 255    |
+| `role`        | string   | Yes      | max 20     |
+| `permissions` | string[] | No       | default [] |
 
 - **Response** (`RoleTemplateResponse`)
 - **Status:** 201 Created
@@ -777,10 +777,10 @@ Update a role template.
 - **Path Parameters:** `template_id` (UUID)
 - **Request Body** (`RoleTemplateUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `name` | string? | No |
-| `permissions` | string[]? | No |
+| Field         | Type      | Required |
+| ------------- | --------- | -------- |
+| `name`        | string?   | No       |
+| `permissions` | string[]? | No       |
 
 - **Response** (`RoleTemplateResponse`)
 
@@ -807,33 +807,33 @@ List departments.
 - **Permission:** `departments.view`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `search` | string? | null |
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param       | Type    | Default      |
+| ----------- | ------- | ------------ |
+| `search`    | string? | null         |
+| `page`      | int     | 1            |
+| `page_size` | int     | 25 (max 100) |
 
 - **Response** (`DepartmentListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                 |
+| ------ | -------------------- |
 | `data` | DepartmentResponse[] |
-| `meta` | `{page, page_size}` |
+| `meta` | `{page, page_size}`  |
 
 `DepartmentResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `name` | string |
-| `code` | string |
-| `school` | string? |
-| `email` | string |
-| `phone` | string? |
-| `tone` | DepartmentTone? |
-| `subject_prefixes` | string[] |
-| `created_at` | datetime |
-| `updated_at` | datetime |
+| Field              | Type            |
+| ------------------ | --------------- |
+| `id`               | UUID            |
+| `name`             | string          |
+| `code`             | string          |
+| `school`           | string?         |
+| `email`            | string          |
+| `phone`            | string?         |
+| `tone`             | DepartmentTone? |
+| `subject_prefixes` | string[]        |
+| `created_at`       | datetime        |
+| `updated_at`       | datetime        |
 
 ---
 
@@ -844,21 +844,21 @@ Create a new department.
 - **Permission:** `departments.manage`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `generate_temp_password` | boolean | false |
+| Param                    | Type    | Default |
+| ------------------------ | ------- | ------- |
+| `generate_temp_password` | boolean | false   |
 
 - **Request Body** (`DepartmentCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string | Yes | max 255 |
-| `code` | string | Yes | max 50 |
-| `school` | string? | No | default "SPMS" |
-| `email` | string | Yes | max 255 |
-| `phone` | string? | No | |
-| `tone` | DepartmentTone? | No | default BLUE |
-| `subject_prefixes` | string[]? | No | default [] |
+| Field              | Type            | Required | Notes          |
+| ------------------ | --------------- | -------- | -------------- |
+| `name`             | string          | Yes      | max 255        |
+| `code`             | string          | Yes      | max 50         |
+| `school`           | string?         | No       | default "SPMS" |
+| `email`            | string          | Yes      | max 255        |
+| `phone`            | string?         | No       |                |
+| `tone`             | DepartmentTone? | No       | default BLUE   |
+| `subject_prefixes` | string[]?       | No       | default []     |
 
 - **Response** (`DepartmentResponse`)
 - **Status:** 201 Created
@@ -875,13 +875,13 @@ Get department details.
 
 Extends `DepartmentResponse` with:
 
-| Field | Type |
-|-------|------|
-| `programmes_count` | int |
-| `courses_count` | int |
-| `lecturers_count` | int |
-| `students_count` | int |
-| `admin_account` | object? |
+| Field              | Type    |
+| ------------------ | ------- |
+| `programmes_count` | int     |
+| `courses_count`    | int     |
+| `lecturers_count`  | int     |
+| `students_count`   | int     |
+| `admin_account`    | object? |
 
 ---
 
@@ -904,10 +904,10 @@ Delete department.
 - **Path Parameters:** `department_id` (UUID)
 - **Query Parameters:**
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `force` | boolean | false | Force delete even if has children |
-| `lecturers` | string | "disable" | What to do with lecturers |
+| Param       | Type    | Default   | Notes                             |
+| ----------- | ------- | --------- | --------------------------------- |
+| `force`     | boolean | false     | Force delete even if has children |
+| `lecturers` | string  | "disable" | What to do with lecturers         |
 
 - **Status:** 204 No Content
 
@@ -934,31 +934,31 @@ List programmes.
 - **Permission:** `programmes.view`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
+| Param           | Type  | Default                                                |
+| --------------- | ----- | ------------------------------------------------------ |
 | `department_id` | UUID? | null (scoped to user's department for DEPARTMENT role) |
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| `page`          | int   | 1                                                      |
+| `page_size`     | int   | 25 (max 100)                                           |
 
 - **Response** (`ProgrammeListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                |
+| ------ | ------------------- |
 | `data` | ProgrammeResponse[] |
 | `meta` | `{page, page_size}` |
 
 `ProgrammeResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `code` | string |
-| `name` | string |
-| `department_id` | UUID |
-| `levels` | int[] |
-| `category` | ProgrammeCategory |
-| `created_at` | datetime |
-| `updated_at` | datetime |
+| Field           | Type              |
+| --------------- | ----------------- |
+| `id`            | UUID              |
+| `code`          | string            |
+| `name`          | string            |
+| `department_id` | UUID              |
+| `levels`        | int[]             |
+| `category`      | ProgrammeCategory |
+| `created_at`    | datetime          |
+| `updated_at`    | datetime          |
 
 ---
 
@@ -969,13 +969,13 @@ Create programme.
 - **Permission:** `programmes.manage`
 - **Request Body** (`ProgrammeCreate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `code` | string | Yes |
-| `name` | string | Yes |
-| `department_id` | UUID | Yes |
-| `levels` | int[] | Yes (min 1) |
-| `category` | ProgrammeCategory | Yes |
+| Field           | Type              | Required    |
+| --------------- | ----------------- | ----------- |
+| `code`          | string            | Yes         |
+| `name`          | string            | Yes         |
+| `department_id` | UUID              | Yes         |
+| `levels`        | int[]             | Yes (min 1) |
+| `category`      | ProgrammeCategory | Yes         |
 
 - **Response** (`ProgrammeResponse`)
 - **Status:** 201 Created
@@ -1000,12 +1000,12 @@ Update programme.
 - **Path Parameters:** `programme_id` (UUID)
 - **Request Body** (`ProgrammeUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `code` | string? | No |
-| `name` | string? | No |
-| `levels` | int[]? | No |
-| `category` | ProgrammeCategory? | No |
+| Field      | Type               | Required |
+| ---------- | ------------------ | -------- |
+| `code`     | string?            | No       |
+| `name`     | string?            | No       |
+| `levels`   | int[]?             | No       |
+| `category` | ProgrammeCategory? | No       |
 
 - **Response** (`ProgrammeResponse`)
 
@@ -1033,46 +1033,46 @@ List courses (scoped by role).
 - **Permission:** `courses.view`
 - **Query Parameters:**
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `department_id` | UUID? | null | Auto-set for DEPARTMENT role |
-| `lecturer_id` | UUID? | null | Auto-set for LECTURER role |
-| `programme_id` | UUID? | null | |
-| `level` | int? | null | |
-| `search` | string? | null | |
-| `page` | int | 1 | |
-| `page_size` | int | 25 (max 100) | |
+| Param           | Type    | Default      | Notes                        |
+| --------------- | ------- | ------------ | ---------------------------- |
+| `department_id` | UUID?   | null         | Auto-set for DEPARTMENT role |
+| `lecturer_id`   | UUID?   | null         | Auto-set for LECTURER role   |
+| `programme_id`  | UUID?   | null         |                              |
+| `level`         | int?    | null         |                              |
+| `search`        | string? | null         |                              |
+| `page`          | int     | 1            |                              |
+| `page_size`     | int     | 25 (max 100) |                              |
 
 - **Response** (`CourseListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | CourseResponse[] |
+| Field  | Type                     |
+| ------ | ------------------------ |
+| `data` | CourseResponse[]         |
 | `meta` | `{page, page_size, ...}` |
 
 `CourseResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `code` | string |
-| `title` | string |
-| `department_id` | UUID |
-| `type` | CourseType |
-| `credit_hours` | int |
-| `mode` | CourseMode |
-| `student_count` | int |
-| `lecturer_id` | UUID? |
-| `cohorts` | CourseCohort[] |
-| `created_at` | datetime |
-| `updated_at` | datetime |
+| Field           | Type           |
+| --------------- | -------------- |
+| `id`            | UUID           |
+| `code`          | string         |
+| `title`         | string         |
+| `department_id` | UUID           |
+| `type`          | CourseType     |
+| `credit_hours`  | int            |
+| `mode`          | CourseMode     |
+| `student_count` | int            |
+| `lecturer_id`   | UUID?          |
+| `cohorts`       | CourseCohort[] |
+| `created_at`    | datetime       |
+| `updated_at`    | datetime       |
 
 `CourseCohort`:
 
-| Field | Type |
-|-------|------|
+| Field          | Type |
+| -------------- | ---- |
 | `programme_id` | UUID |
-| `level` | int |
+| `level`        | int  |
 
 ---
 
@@ -1083,17 +1083,17 @@ Create course.
 - **Permission:** `courses.manage`
 - **Request Body** (`CourseCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `code` | string | Yes | max 50 |
-| `title` | string | Yes | max 255 |
-| `department_id` | UUID | Yes | |
-| `type` | CourseType | Yes | |
-| `credit_hours` | int | Yes | 1-6 |
-| `mode` | CourseMode | No | default IN_PERSON |
-| `student_count` | int | Yes | min 1 |
-| `lecturer_id` | UUID? | No | |
-| `cohorts` | CourseCohort[] | Yes | min 1 item |
+| Field           | Type           | Required | Notes             |
+| --------------- | -------------- | -------- | ----------------- |
+| `code`          | string         | Yes      | max 50            |
+| `title`         | string         | Yes      | max 255           |
+| `department_id` | UUID           | Yes      |                   |
+| `type`          | CourseType     | Yes      |                   |
+| `credit_hours`  | int            | Yes      | 1-6               |
+| `mode`          | CourseMode     | No       | default IN_PERSON |
+| `student_count` | int            | Yes      | min 1             |
+| `lecturer_id`   | UUID?          | No       |                   |
+| `cohorts`       | CourseCohort[] | Yes      | min 1 item        |
 
 - **Response** (`CourseResponse`)
 - **Status:** 201 Created
@@ -1140,10 +1140,10 @@ Get enrolled students for a course.
 - **Path Parameters:** `course_id` (UUID)
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param       | Type | Default      |
+| ----------- | ---- | ------------ |
+| `page`      | int  | 1            |
+| `page_size` | int  | 25 (max 100) |
 
 - **Response:**
 
@@ -1159,7 +1159,7 @@ Get enrolled students for a course.
       "level": "int"
     }
   ],
-  "meta": {"page": 1, "page_size": 25}
+  "meta": { "page": 1, "page_size": 25 }
 }
 ```
 
@@ -1176,39 +1176,39 @@ List venues.
 - **Permission:** `venues.view`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `venue_type` | string? | null |
-| `status` | string? | null |
-| `search` | string? | null |
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param        | Type    | Default      |
+| ------------ | ------- | ------------ |
+| `venue_type` | string? | null         |
+| `status`     | string? | null         |
+| `search`     | string? | null         |
+| `page`       | int     | 1            |
+| `page_size`  | int     | 25 (max 100) |
 
 - **Response** (`VenueListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | VenueResponse[] |
+| Field  | Type                |
+| ------ | ------------------- |
+| `data` | VenueResponse[]     |
 | `meta` | `{page, page_size}` |
 
 `VenueResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `code` | string? |
-| `building` | string |
-| `room_number` | string |
-| `location` | string? |
-| `gps_address` | string? |
-| `latitude` | string? |
-| `longitude` | string? |
-| `capacity` | int? |
-| `type` | VenueType |
-| `is_shared` | boolean |
-| `status` | VenueStatus |
-| `created_at` | datetime |
-| `updated_at` | datetime |
+| Field         | Type        |
+| ------------- | ----------- |
+| `id`          | UUID        |
+| `code`        | string?     |
+| `building`    | string      |
+| `room_number` | string      |
+| `location`    | string?     |
+| `gps_address` | string?     |
+| `latitude`    | string?     |
+| `longitude`   | string?     |
+| `capacity`    | int?        |
+| `type`        | VenueType   |
+| `is_shared`   | boolean     |
+| `status`      | VenueStatus |
+| `created_at`  | datetime    |
+| `updated_at`  | datetime    |
 
 ---
 
@@ -1219,19 +1219,19 @@ Create venue.
 - **Permission:** `venues.manage`
 - **Request Body** (`VenueCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `code` | string? | No | |
-| `building` | string | Yes | max 100 |
-| `room_number` | string | Yes | max 50 |
-| `location` | string? | No | |
-| `gps_address` | string? | No | |
-| `latitude` | string? | No | |
-| `longitude` | string? | No | |
-| `capacity` | int? | No | |
-| `type` | VenueType | Yes | |
-| `is_shared` | boolean | No | default false |
-| `status` | VenueStatus | No | default AVAILABLE |
+| Field         | Type        | Required | Notes             |
+| ------------- | ----------- | -------- | ----------------- |
+| `code`        | string?     | No       |                   |
+| `building`    | string      | Yes      | max 100           |
+| `room_number` | string      | Yes      | max 50            |
+| `location`    | string?     | No       |                   |
+| `gps_address` | string?     | No       |                   |
+| `latitude`    | string?     | No       |                   |
+| `longitude`   | string?     | No       |                   |
+| `capacity`    | int?        | No       |                   |
+| `type`        | VenueType   | Yes      |                   |
+| `is_shared`   | boolean     | No       | default false     |
+| `status`      | VenueStatus | No       | default AVAILABLE |
 
 - **Response** (`VenueResponse`)
 - **Status:** 201 Created
@@ -1277,10 +1277,10 @@ Mark venue as unavailable.
 - **Path Parameters:** `venue_id` (UUID)
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `reason` | string | Yes |
-| `until` | datetime? | No |
+| Param    | Type      | Required |
+| -------- | --------- | -------- |
+| `reason` | string    | Yes      |
+| `until`  | datetime? | No       |
 
 - **Response** (`VenueResponse`)
 
@@ -1307,27 +1307,27 @@ List all semesters.
 - **Permission:** Authenticated user
 - **Response** (`SemesterListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type               |
+| ------ | ------------------ |
 | `data` | SemesterResponse[] |
 
 `SemesterResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `academic_year` | string |
-| `number` | int |
-| `label` | string |
-| `start_date` | datetime |
-| `end_date` | datetime |
-| `teaching_start` | datetime? |
-| `teaching_end` | datetime? |
+| Field                   | Type      |
+| ----------------------- | --------- |
+| `id`                    | UUID      |
+| `academic_year`         | string    |
+| `number`                | int       |
+| `label`                 | string    |
+| `start_date`            | datetime  |
+| `end_date`              | datetime  |
+| `teaching_start`        | datetime? |
+| `teaching_end`          | datetime? |
 | `registration_deadline` | datetime? |
-| `graduation_deadline` | datetime? |
-| `is_active` | boolean |
-| `created_at` | datetime |
-| `updated_at` | datetime |
+| `graduation_deadline`   | datetime? |
+| `is_active`             | boolean   |
+| `created_at`            | datetime  |
+| `updated_at`            | datetime  |
 
 ---
 
@@ -1338,18 +1338,18 @@ Create semester.
 - **Permission:** `settings.institution`
 - **Request Body** (`SemesterCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `academic_year` | string | Yes | e.g. "2026/27" |
-| `number` | int | Yes | 1 or 2 |
-| `label` | string | Yes | max 50 |
-| `start_date` | datetime | Yes | |
-| `end_date` | datetime | Yes | |
-| `teaching_start` | datetime? | No | |
-| `teaching_end` | datetime? | No | |
-| `registration_deadline` | datetime? | No | |
-| `graduation_deadline` | datetime? | No | |
-| `is_active` | boolean | No | default false |
+| Field                   | Type      | Required | Notes          |
+| ----------------------- | --------- | -------- | -------------- |
+| `academic_year`         | string    | Yes      | e.g. "2026/27" |
+| `number`                | int       | Yes      | 1 or 2         |
+| `label`                 | string    | Yes      | max 50         |
+| `start_date`            | datetime  | Yes      |                |
+| `end_date`              | datetime  | Yes      |                |
+| `teaching_start`        | datetime? | No       |                |
+| `teaching_end`          | datetime? | No       |                |
+| `registration_deadline` | datetime? | No       |                |
+| `graduation_deadline`   | datetime? | No       |                |
+| `is_active`             | boolean   | No       | default false  |
 
 - **Response** (`SemesterResponse`)
 - **Status:** 201 Created
@@ -1398,14 +1398,14 @@ List uploaded master timetables.
 - **Permission:** `timetable.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
+| Param         | Type | Required |
+| ------------- | ---- | -------- |
+| `semester_id` | UUID | Yes      |
 
 - **Response** (`TimetableListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type     |
+| ------ | -------- |
 | `data` | object[] |
 
 ---
@@ -1417,20 +1417,20 @@ Get master timetable entries.
 - **Permission:** `timetable.view`
 - **Query Parameters:**
 
-| Param | Type | Required | Notes |
-|-------|------|----------|-------|
-| `semester_id` | UUID | Yes | |
-| `level` | int? | No | |
-| `venue` | string? | No | Venue code |
-| `subjects` | string? | No | Comma-separated |
-| `day` | int? | No | Day index |
+| Param         | Type    | Required | Notes           |
+| ------------- | ------- | -------- | --------------- |
+| `semester_id` | UUID    | Yes      |                 |
+| `level`       | int?    | No       |                 |
+| `venue`       | string? | No       | Venue code      |
+| `subjects`    | string? | No       | Comma-separated |
+| `day`         | int?    | No       | Day index       |
 
 - **Response** (`TimetableEntriesResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type     |
+| ------ | -------- |
 | `data` | object[] |
-| `meta` | object |
+| `meta` | object   |
 
 ---
 
@@ -1442,21 +1442,21 @@ Preview master timetable upload. Accepts Excel (.xlsx) or CSV file.
 - **Content-Type:** `multipart/form-data`
 - **Query Parameters:**
 
-| Param | Type | Required | Notes |
-|-------|------|----------|-------|
-| `semester_id` | UUID | Yes | |
-| `level` | int? | No | 100-400; omit to parse all levels |
+| Param         | Type | Required | Notes                             |
+| ------------- | ---- | -------- | --------------------------------- |
+| `semester_id` | UUID | Yes      |                                   |
+| `level`       | int? | No       | 100-400; omit to parse all levels |
 
 - **Form Data:** `file` (UploadFile, .xlsx or .csv)
 - **Response** (`TimetablePreviewResponse`):
 
-| Field | Type |
-|-------|------|
-| `preview_id` | string |
-| `entries` | object[] |
-| `issues` | object[] |
-| `summary` | object |
-| `replaces` | object? |
+| Field               | Type     |
+| ------------------- | -------- |
+| `preview_id`        | string   |
+| `entries`           | object[] |
+| `issues`            | object[] |
+| `summary`           | object   |
+| `replaces`          | object?  |
 | `affected_requests` | object[] |
 
 ---
@@ -1468,9 +1468,9 @@ Publish previewed master timetable.
 - **Permission:** `timetable.upload`
 - **Request Body** (`TimetablePublishRequest`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `preview_id` | string | Yes |
+| Field        | Type   | Required |
+| ------------ | ------ | -------- |
+| `preview_id` | string | Yes      |
 
 - **Response:** `{"message": "..."}`
 
@@ -1484,20 +1484,20 @@ Preview department timetable upload.
 - **Content-Type:** `multipart/form-data`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
-| `department_id` | UUID | Yes |
+| Param           | Type | Required |
+| --------------- | ---- | -------- |
+| `semester_id`   | UUID | Yes      |
+| `department_id` | UUID | Yes      |
 
 - **Form Data:** `file` (UploadFile, .xlsx or .csv)
 - **Response** (`DepartmentTimetablePreviewResponse`):
 
-| Field | Type |
-|-------|------|
-| `preview_id` | string |
-| `entries` | object[] |
-| `conflicts` | object[] |
-| `summary` | object |
+| Field        | Type     |
+| ------------ | -------- |
+| `preview_id` | string   |
+| `entries`    | object[] |
+| `conflicts`  | object[] |
+| `summary`    | object   |
 
 ---
 
@@ -1508,9 +1508,9 @@ Publish previewed department timetable.
 - **Permission:** `timetable.department_upload`
 - **Request Body** (`TimetablePublishRequest`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `preview_id` | string | Yes |
+| Field        | Type   | Required |
+| ------------ | ------ | -------- |
+| `preview_id` | string | Yes      |
 
 - **Response:** `{"message": "..."}`
 
@@ -1532,10 +1532,10 @@ Export master timetable as CSV.
 - **Permission:** `timetable.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
-| `level` | int? | No |
+| Param         | Type | Required |
+| ------------- | ---- | -------- |
+| `semester_id` | UUID | Yes      |
+| `level`       | int? | No       |
 
 - **Response:** CSV file download
 
@@ -1548,9 +1548,9 @@ Get timetable upload history.
 - **Permission:** `timetable.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
+| Param         | Type | Required |
+| ------------- | ---- | -------- |
+| `semester_id` | UUID | Yes      |
 
 - **Response:** `{"data": [...]}`
 
@@ -1563,14 +1563,14 @@ Create a new master timetable entry.
 - **Permission:** `timetable.edit`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
-| `level` | int | Yes |
-| `day` | int | Yes |
-| `period` | int | Yes |
-| `subject` | string | Yes |
-| `venue_code` | string | Yes |
+| Param         | Type   | Required |
+| ------------- | ------ | -------- |
+| `semester_id` | UUID   | Yes      |
+| `level`       | int    | Yes      |
+| `day`         | int    | Yes      |
+| `period`      | int    | Yes      |
+| `subject`     | string | Yes      |
+| `venue_code`  | string | Yes      |
 
 - **Response:** `{"data": {"id": "UUID", "subject": "...", "venue_code": "..."}}`
 - **Status:** 201 Created
@@ -1585,11 +1585,11 @@ Update a master timetable entry.
 - **Path Parameters:** `entry_id` (UUID)
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `subject` | string? | No |
-| `venue_code` | string? | No |
-| `is_free` | boolean? | No |
+| Param        | Type     | Required |
+| ------------ | -------- | -------- |
+| `subject`    | string?  | No       |
+| `venue_code` | string?  | No       |
+| `is_free`    | boolean? | No       |
 
 - **Response:** `{"data": {"id": "UUID", "subject": "...", "venue_code": "...", "is_free": bool}}`
 
@@ -1612,9 +1612,9 @@ Find cells with multiple subjects (excluding shared venues).
 - **Permission:** `timetable.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
+| Param         | Type | Required |
+| ------------- | ---- | -------- |
+| `semester_id` | UUID | Yes      |
 
 - **Response:** `{"data": [{"venue": "...", "day": 0, "period": 0, "subjects": ["..."]}]}`
 
@@ -1631,12 +1631,12 @@ Get FREE slots for scheduling.
 - **Permission:** `schedule.view`
 - **Query Parameters:**
 
-| Param | Type | Required | Notes |
-|-------|------|----------|-------|
-| `semester_id` | UUID | Yes | |
-| `level` | int? | No | |
-| `venue` | string? | No | Venue code |
-| `view` | string | No | default "free" |
+| Param         | Type    | Required | Notes          |
+| ------------- | ------- | -------- | -------------- |
+| `semester_id` | UUID    | Yes      |                |
+| `level`       | int?    | No       |                |
+| `venue`       | string? | No       | Venue code     |
+| `view`        | string  | No       | default "free" |
 
 - **Response:** Free slot data object
 
@@ -1649,22 +1649,22 @@ Check for clashes before submitting a slot request.
 - **Permission:** `schedule.request`
 - **Request Body** (`SlotRequestCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `course_id` | UUID | Yes | |
-| `semester_id` | UUID | Yes | |
-| `level` | int | Yes | |
-| `day` | int | Yes | |
-| `venue_code` | string | Yes | |
-| `start_period` | int | Yes | |
-| `period_count` | int | Yes | 1-3 |
+| Field          | Type   | Required | Notes |
+| -------------- | ------ | -------- | ----- |
+| `course_id`    | UUID   | Yes      |       |
+| `semester_id`  | UUID   | Yes      |       |
+| `level`        | int    | Yes      |       |
+| `day`          | int    | Yes      |       |
+| `venue_code`   | string | Yes      |       |
+| `start_period` | int    | Yes      |       |
+| `period_count` | int    | Yes      | 1-3   |
 
 - **Response** (`SlotRequestCheckResponse`):
 
-| Field | Type |
-|-------|------|
-| `clashes` | object[] |
-| `blocking` | boolean |
+| Field      | Type     |
+| ---------- | -------- |
+| `clashes`  | object[] |
+| `blocking` | boolean  |
 
 ---
 
@@ -1676,25 +1676,25 @@ Submit slot request.
 - **Request Body** (`SlotRequestCreate`): Same as check endpoint.
 - **Response** (`SlotRequestResponse`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `course_id` | UUID |
-| `department_id` | UUID |
-| `requested_by_id` | UUID |
-| `semester_id` | UUID |
-| `level` | int |
-| `day` | int |
-| `venue_code` | string |
-| `start_period` | int |
-| `period_count` | int |
-| `status` | string |
-| `review_comment` | string? |
-| `reviewed_by_id` | UUID? |
-| `reviewed_at` | string? |
-| `schedule_item_id` | UUID? |
-| `clashes` | object[] |
-| `competing` | object[] |
+| Field              | Type     |
+| ------------------ | -------- |
+| `id`               | UUID     |
+| `course_id`        | UUID     |
+| `department_id`    | UUID     |
+| `requested_by_id`  | UUID     |
+| `semester_id`      | UUID     |
+| `level`            | int      |
+| `day`              | int      |
+| `venue_code`       | string   |
+| `start_period`     | int      |
+| `period_count`     | int      |
+| `status`           | string   |
+| `review_comment`   | string?  |
+| `reviewed_by_id`   | UUID?    |
+| `reviewed_at`      | string?  |
+| `schedule_item_id` | UUID?    |
+| `clashes`          | object[] |
+| `competing`        | object[] |
 
 - **Status:** 201 Created
 
@@ -1707,18 +1707,18 @@ List slot requests.
 - **Permission:** `schedule.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
-| `status` | string? | No |
-| `department_id` | UUID? | No |
+| Param           | Type    | Required |
+| --------------- | ------- | -------- |
+| `semester_id`   | UUID    | Yes      |
+| `status`        | string? | No       |
+| `department_id` | UUID?   | No       |
 
 - **Response** (`SlotRequestListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                  |
+| ------ | --------------------- |
 | `data` | SlotRequestResponse[] |
-| `meta` | object |
+| `meta` | object                |
 
 ---
 
@@ -1776,40 +1776,40 @@ List schedule items.
 - **Permission:** `schedule.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
-| `department_id` | UUID? | No |
-| `level` | int? | No |
-| `venue_type` | string? | No |
-| `search` | string? | No |
-| `status` | string? | No |
+| Param           | Type    | Required |
+| --------------- | ------- | -------- |
+| `semester_id`   | UUID    | Yes      |
+| `department_id` | UUID?   | No       |
+| `level`         | int?    | No       |
+| `venue_type`    | string? | No       |
+| `search`        | string? | No       |
+| `status`        | string? | No       |
 
 - **Response** (`ScheduleItemListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                   |
+| ------ | ---------------------- |
 | `data` | ScheduleItemResponse[] |
-| `meta` | object |
+| `meta` | object                 |
 
 `ScheduleItemResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `semester_id` | UUID |
-| `course_id` | UUID |
-| `department_id` | UUID |
-| `day` | int |
-| `start_period` | int? |
-| `period_count` | int? |
-| `start` | string? |
-| `end` | string? |
-| `venue_code` | string |
-| `lecturer_id` | UUID? |
-| `mode` | string |
-| `status` | string |
-| `source` | string |
+| Field           | Type    |
+| --------------- | ------- |
+| `id`            | UUID    |
+| `semester_id`   | UUID    |
+| `course_id`     | UUID    |
+| `department_id` | UUID    |
+| `day`           | int     |
+| `start_period`  | int?    |
+| `period_count`  | int?    |
+| `start`         | string? |
+| `end`           | string? |
+| `venue_code`    | string  |
+| `lecturer_id`   | UUID?   |
+| `mode`          | string  |
+| `status`        | string  |
+| `source`        | string  |
 
 ---
 
@@ -1820,19 +1820,19 @@ Create manual schedule item.
 - **Permission:** `schedule.manage`
 - **Request Body** (`ScheduleItemCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `semester_id` | UUID | Yes | |
-| `course_id` | UUID | Yes | |
-| `day` | int | Yes | 0-4 (Mon-Fri) |
-| `start` | string? | No | Time string |
-| `end` | string? | No | Time string |
-| `start_period` | int? | No | Period index |
-| `period_count` | int? | No | 1-3 |
-| `venue_code` | string | Yes | |
-| `lecturer_id` | UUID? | No | |
-| `mode` | string | No | default "in-person" |
-| `groups` | object[] | No | default [] |
+| Field          | Type     | Required | Notes               |
+| -------------- | -------- | -------- | ------------------- |
+| `semester_id`  | UUID     | Yes      |                     |
+| `course_id`    | UUID     | Yes      |                     |
+| `day`          | int      | Yes      | 0-4 (Mon-Fri)       |
+| `start`        | string?  | No       | Time string         |
+| `end`          | string?  | No       | Time string         |
+| `start_period` | int?     | No       | Period index        |
+| `period_count` | int?     | No       | 1-3                 |
+| `venue_code`   | string   | Yes      |                     |
+| `lecturer_id`  | UUID?    | No       |                     |
+| `mode`         | string   | No       | default "in-person" |
+| `groups`       | object[] | No       | default []          |
 
 - **Response** (`ScheduleItemResponse`)
 - **Status:** 201 Created
@@ -1877,10 +1877,10 @@ Publish pending schedule items.
 - **Permission:** `schedule.manage`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `ids` | UUID[]? | No |
-| `course_code` | string? | No |
+| Param         | Type    | Required |
+| ------------- | ------- | -------- |
+| `ids`         | UUID[]? | No       |
+| `course_code` | string? | No       |
 
 - **Response:** `{"message": "N courses published"}`
 
@@ -1893,10 +1893,10 @@ Get final published timetable.
 - **Permission:** `schedule.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
-| `level` | int? | No |
+| Param         | Type | Required |
+| ------------- | ---- | -------- |
+| `semester_id` | UUID | Yes      |
+| `level`       | int? | No       |
 
 - **Response** (`ScheduleItemListResponse`)
 
@@ -1909,10 +1909,10 @@ Export final timetable as CSV.
 - **Permission:** `schedule.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
-| `level` | int? | No |
+| Param         | Type | Required |
+| ------------- | ---- | -------- |
+| `semester_id` | UUID | Yes      |
+| `level`       | int? | No       |
 
 - **Response:** CSV file download
 
@@ -1920,87 +1920,135 @@ Export final timetable as CSV.
 
 ## 16. Personal Timetable
 
-Prefix: `/api/v1/me/timetable`
+Prefix: `/api/me/timetable`
 
-### GET `/api/v1/me/timetable`
+Returns a student's personalised view of the master timetable, filtered to only the courses they are registered for (via self-registration or cohort membership).
 
-Get personal timetable for current user (lecturer or student).
+### GET `/api/me/timetable/master`
 
-- **Permission:** Authenticated user (lecturer, student, or super)
+Get master timetable entries filtered to the current student's registered and cohort courses.
+
+- **Permission:** Authenticated user (STUDENT or SUPER)
 - **Query Parameters:**
 
-| Param | Type | Required | Notes |
-|-------|------|----------|-------|
-| `semester_id` | UUID? | No | |
-| `week_of` | string? | No | Date string |
-| `include` | string? | No | "department" or "lecturer" |
+| Param          | Type    | Required | Notes                                                                                                                        |
+| -------------- | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `semester_id`  | UUID?   | No       | Falls back to the active semester                                                                                            |
+| `course_codes` | string? | No       | Comma-separated course codes to filter (e.g. `DCIT101,DCIT133`). If omitted, uses the student's registered + cohort courses. |
 
-- **Response** (`PersonalTimetableResponse`):
+- **Response** (`PersonalMasterTimetableResponse`):
 
-| Field | Type |
-|-------|------|
-| `items` | TimetableItem[] |
-| `assessments` | PersonalAssessment[] |
-| `stats` | TimetableStats |
+| Field               | Type                | Notes                                              |
+| ------------------- | ------------------- | -------------------------------------------------- |
+| `entries`           | MasterEntryItem[]   | Timetable entries matching the student's courses   |
+| `matched_courses`   | string[]            | Course codes that were found on the timetable      |
+| `unmatched_courses` | string[]            | Registered course codes not found on the timetable |
+| `stats`             | PersonalMasterStats | Summary statistics                                 |
 
-`TimetableItem`:
+`MasterEntryItem`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `course_code` | string |
-| `course_title` | string |
-| `day` | int |
-| `start` | string? |
-| `end` | string? |
-| `venue_code` | string |
-| `lecturer_name` | string? |
-| `mode` | string? |
-| `department_name` | string? |
-| `tone` | string? |
-| `status` | string? |
-| `groups` | string[] |
-| `assigned_to_me` | boolean |
+| Field          | Type    | Notes                                                                   |
+| -------------- | ------- | ----------------------------------------------------------------------- |
+| `id`           | UUID    |                                                                         |
+| `level`        | int     | Timetable level (100-400)                                               |
+| `course_code`  | string  | Full subject string as it appears on timetable (e.g. `"DCIT 101(FAK)"`) |
+| `subject`      | string  | Same as `course_code`                                                   |
+| `day`          | int     | 0=Monday, 1=Tuesday, ... 6=Sunday                                       |
+| `day_name`     | string? | e.g. `"Monday"`                                                         |
+| `period`       | int     | Period index (0-based)                                                  |
+| `period_start` | string  | Start time, e.g. `"07:30"`                                              |
+| `period_end`   | string  | End time, e.g. `"08:20"`                                                |
+| `venue_code`   | string  |                                                                         |
+| `is_free`      | boolean | Always `false` (free periods are excluded)                              |
+| `course_kind`  | string? | e.g. `"C"` (Core), `"E"` (Elective)                                     |
+| `source`       | string  | `"master"` or `"department"`                                            |
 
-`PersonalAssessment`:
+`PersonalMasterStats`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `course_code` | string |
-| `course_title` | string |
-| `assessment_type` | string |
-| `date` | datetime? |
-| `start_time` | string? |
-| `end_time` | string? |
-| `location` | string? |
-| `status` | string |
+| Field               | Type |
+| ------------------- | ---- |
+| `total_entries`     | int  |
+| `weekly_classes`    | int  |
+| `classes_today`     | int  |
+| `courses_found`     | int  |
+| `courses_not_found` | int  |
 
-`TimetableStats`:
+**How course matching works:**
 
-| Field | Type |
-|-------|------|
-| `weekly_classes` | int |
-| `classes_today` | int |
-| `upcoming_assessments` | int |
-| `registered_courses` | int |
-| `teaching_groups` | int |
+The student's courses come from two sources:
+
+1. **Explicit registrations** -- courses registered via `POST /api/me/registrations`
+2. **Cohort courses** -- courses linked to the student's programme + level via `course_cohorts`
+
+Course codes are normalised for matching (whitespace and parenthesized suffixes like `(FAK)` are stripped), but the full subject string (including lecturer initials) is preserved in the response.
 
 ---
 
-### GET `/api/v1/me/timetable/export`
+### GET `/api/me/timetable/master/export`
 
-Export personal timetable as CSV.
+Export the personalised master timetable as a CSV file.
 
-- **Permission:** Authenticated user (lecturer, student, or super)
+- **Permission:** Authenticated user (STUDENT or SUPER)
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID? | No |
-| `format` | string | No (default "csv") |
+| Param          | Type    | Required | Notes                             |
+| -------------- | ------- | -------- | --------------------------------- |
+| `semester_id`  | UUID?   | No       | Falls back to the active semester |
+| `course_codes` | string? | No       | Comma-separated course codes      |
 
-- **Response:** CSV file download
+- **Response:** CSV file download (`my-master-timetable.csv`)
+- **CSV Columns:** `Day`, `Time`, `Course`, `Venue`, `Level`, `Type`
+
+---
+
+### GET `/api/me/timetable/master/{entry_id}`
+
+Get detailed information about a single timetable entry, enriched with course details, lecturer info, department, and venue details.
+
+- **Permission:** Authenticated user (STUDENT or SUPER)
+- **Path Parameters:** `entry_id` (UUID)
+- **Response** (`MasterEntryDetailResponse`):
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | UUID | |
+| `level` | int | Timetable level |
+| `course_code` | string | Full subject string (e.g. `"DCIT 103(MW)"`) |
+| `subject` | string | Same as `course_code` |
+| `day` | int | 0=Monday ... 6=Sunday |
+| `day_name` | string? | e.g. `"Tuesday"` |
+| `period` | int | Period index (0-based) |
+| `period_start` | string | e.g. `"12:30"` |
+| `period_end` | string | e.g. `"13:20"` |
+| `venue_code` | string | |
+| `is_free` | boolean | |
+| `course_kind` | string? | `"C"` or `"E"` |
+| `source` | string | `"master"` or `"department"` |
+| `course_id` | UUID? | Matched course record ID |
+| `course_title` | string? | e.g. `"Office Productivity Tools"` |
+| `course_type` | string? | e.g. `"Core"`, `"Elective"` |
+| `course_mode` | string? | e.g. `"in-person"`, `"online"`, `"hybrid"` |
+| `credit_hours` | int? | |
+| `lecturer_id` | UUID? | |
+| `lecturer_name` | string? | |
+| `lecturer_email` | string? | |
+| `lecturer_office` | string? | |
+| `department_id` | UUID? | |
+| `department_name` | string? | |
+| `department_code` | string? | |
+| `venue` | VenueDetail? | Full venue information (if venue exists in system) |
+
+`VenueDetail`:
+
+| Field | Type |
+|-------|------|
+| `id` | UUID |
+| `code` | string? |
+| `building` | string |
+| `room_number` | string |
+| `location` | string? |
+| `capacity` | int? |
+| `type` | string? |
 
 ---
 
@@ -2015,59 +2063,59 @@ Get scheduling conflicts (Conflict Centre).
 - **Permission:** `conflicts.view`
 - **Query Parameters:**
 
-| Param | Type | Required | Notes |
-|-------|------|----------|-------|
-| `semester_id` | UUID? | No | Falls back to active semester |
+| Param         | Type  | Required | Notes                         |
+| ------------- | ----- | -------- | ----------------------------- |
+| `semester_id` | UUID? | No       | Falls back to active semester |
 
 - **Response** (`ConflictResponse`):
 
-| Field | Type |
-|-------|------|
-| `requests` | RequestWithClashes[] |
-| `stats` | ConflictStats |
-| `double_bookings` | DoubleBooking[] |
+| Field             | Type                 |
+| ----------------- | -------------------- |
+| `requests`        | RequestWithClashes[] |
+| `stats`           | ConflictStats        |
+| `double_bookings` | DoubleBooking[]      |
 
 `RequestWithClashes`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `course_code` | string |
-| `course_title` | string |
-| `department_name` | string |
-| `venue_code` | string |
-| `day` | int |
-| `start_period` | int |
-| `period_count` | int |
-| `status` | string |
-| `slot_label` | string |
-| `clashes` | ClashDetail[] |
+| Field             | Type          |
+| ----------------- | ------------- |
+| `id`              | UUID          |
+| `course_code`     | string        |
+| `course_title`    | string        |
+| `department_name` | string        |
+| `venue_code`      | string        |
+| `day`             | int           |
+| `start_period`    | int           |
+| `period_count`    | int           |
+| `status`          | string        |
+| `slot_label`      | string        |
+| `clashes`         | ClashDetail[] |
 
 `ClashDetail`:
 
-| Field | Type |
-|-------|------|
-| `kind` | string |
-| `severity` | string |
-| `message` | string |
-| `other_request_id` | UUID? |
-| `other_schedule_item_id` | UUID? |
+| Field                    | Type   |
+| ------------------------ | ------ |
+| `kind`                   | string |
+| `severity`               | string |
+| `message`                | string |
+| `other_request_id`       | UUID?  |
+| `other_schedule_item_id` | UUID?  |
 
 `ConflictStats`:
 
-| Field | Type |
-|-------|------|
-| `with_danger` | int |
-| `warnings_only` | int |
-| `double_bookings` | int |
+| Field             | Type |
+| ----------------- | ---- |
+| `with_danger`     | int  |
+| `warnings_only`   | int  |
+| `double_bookings` | int  |
 
 `DoubleBooking`:
 
-| Field | Type |
-|-------|------|
-| `venue` | string |
-| `day` | int |
-| `period` | int |
+| Field      | Type     |
+| ---------- | -------- |
+| `venue`    | string   |
+| `day`      | int      |
+| `period`   | int      |
 | `subjects` | string[] |
 
 ---
@@ -2083,35 +2131,35 @@ List faculty members.
 - **Permission:** `staff.view`
 - **Query Parameters:**
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `status` | string? | null | Filter by status |
-| `search` | string? | null | |
-| `department_id` | UUID? | null | Scoped for DEPARTMENT role |
-| `page` | int | 1 | |
-| `page_size` | int | 25 (max 100) | |
+| Param           | Type    | Default      | Notes                      |
+| --------------- | ------- | ------------ | -------------------------- |
+| `status`        | string? | null         | Filter by status           |
+| `search`        | string? | null         |                            |
+| `department_id` | UUID?   | null         | Scoped for DEPARTMENT role |
+| `page`          | int     | 1            |                            |
+| `page_size`     | int     | 25 (max 100) |                            |
 
 - **Response** (`FacultyListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | FacultyResponse[] |
+| Field  | Type                      |
+| ------ | ------------------------- |
+| `data` | FacultyResponse[]         |
 | `meta` | `{page, pageSize, total}` |
 
 `FacultyResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `name` | string |
-| `email` | string |
-| `rank` | StaffRank? |
-| `staff_id` | string? |
-| `department_id` | UUID? |
-| `status` | UserStatus |
-| `course_count` | int |
-| `last_login_at` | datetime? |
-| `created_at` | datetime |
+| Field           | Type       |
+| --------------- | ---------- |
+| `id`            | UUID       |
+| `name`          | string     |
+| `email`         | string     |
+| `rank`          | StaffRank? |
+| `staff_id`      | string?    |
+| `department_id` | UUID?      |
+| `status`        | UserStatus |
+| `course_count`  | int        |
+| `last_login_at` | datetime?  |
+| `created_at`    | datetime   |
 
 ---
 
@@ -2122,13 +2170,13 @@ Create faculty member.
 - **Permission:** `staff.manage`
 - **Request Body** (`FacultyCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string | Yes | max 255 |
-| `email` | string | Yes | max 255 |
-| `rank` | StaffRank? | No | |
-| `staff_id` | string? | No | max 50 |
-| `department_id` | UUID? | No | Defaults to user's department |
+| Field           | Type       | Required | Notes                         |
+| --------------- | ---------- | -------- | ----------------------------- |
+| `name`          | string     | Yes      | max 255                       |
+| `email`         | string     | Yes      | max 255                       |
+| `rank`          | StaffRank? | No       |                               |
+| `staff_id`      | string?    | No       | max 50                        |
+| `department_id` | UUID?      | No       | Defaults to user's department |
 
 - **Response** (`FacultyResponse`)
 - **Status:** 201 Created
@@ -2143,12 +2191,12 @@ Update faculty member.
 - **Path Parameters:** `faculty_id` (UUID)
 - **Request Body** (`FacultyUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `name` | string? | No |
-| `rank` | StaffRank? | No |
-| `phone` | string? | No |
-| `office` | string? | No |
+| Field    | Type       | Required |
+| -------- | ---------- | -------- |
+| `name`   | string?    | No       |
+| `rank`   | StaffRank? | No       |
+| `phone`  | string?    | No       |
+| `office` | string?    | No       |
 
 - **Response** (`FacultyResponse`)
 
@@ -2185,37 +2233,37 @@ List staff members.
 - **Permission:** `users.manage`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `role` | string? | null |
-| `status` | string? | null |
-| `search` | string? | null |
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param       | Type    | Default      |
+| ----------- | ------- | ------------ |
+| `role`      | string? | null         |
+| `status`    | string? | null         |
+| `search`    | string? | null         |
+| `page`      | int     | 1            |
+| `page_size` | int     | 25 (max 100) |
 
 - **Response** (`StaffListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | StaffResponse[] |
+| Field  | Type                       |
+| ------ | -------------------------- |
+| `data` | StaffResponse[]            |
 | `meta` | `{page, pageSize, counts}` |
 
 `StaffResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `name` | string |
-| `email` | string |
-| `role` | UserRole |
-| `rank` | StaffRank? |
-| `staff_id` | string? |
-| `department_id` | UUID? |
-| `department_name` | string? |
-| `status` | UserStatus |
-| `course_count` | int |
-| `last_login_at` | datetime? |
-| `created_at` | datetime |
+| Field             | Type       |
+| ----------------- | ---------- |
+| `id`              | UUID       |
+| `name`            | string     |
+| `email`           | string     |
+| `role`            | UserRole   |
+| `rank`            | StaffRank? |
+| `staff_id`        | string?    |
+| `department_id`   | UUID?      |
+| `department_name` | string?    |
+| `status`          | UserStatus |
+| `course_count`    | int        |
+| `last_login_at`   | datetime?  |
+| `created_at`      | datetime   |
 
 ---
 
@@ -2226,14 +2274,14 @@ Create staff member.
 - **Permission:** `users.manage`
 - **Request Body** (`StaffCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string | Yes | max 255 |
-| `staff_id` | string? | No | max 50 |
-| `email` | string | Yes | max 255 |
-| `rank` | StaffRank? | No | |
-| `department_id` | UUID? | No | |
-| `role` | UserRole | No | default LECTURER |
+| Field           | Type       | Required | Notes            |
+| --------------- | ---------- | -------- | ---------------- |
+| `name`          | string     | Yes      | max 255          |
+| `staff_id`      | string?    | No       | max 50           |
+| `email`         | string     | Yes      | max 255          |
+| `rank`          | StaffRank? | No       |                  |
+| `department_id` | UUID?      | No       |                  |
+| `role`          | UserRole   | No       | default LECTURER |
 
 - **Response** (`StaffResponse`)
 - **Status:** 201 Created
@@ -2248,13 +2296,13 @@ Update staff member.
 - **Path Parameters:** `staff_id` (UUID)
 - **Request Body** (`StaffUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `name` | string? | No |
-| `rank` | StaffRank? | No |
-| `department_id` | UUID? | No |
-| `phone` | string? | No |
-| `office` | string? | No |
+| Field           | Type       | Required |
+| --------------- | ---------- | -------- |
+| `name`          | string?    | No       |
+| `rank`          | StaffRank? | No       |
+| `department_id` | UUID?      | No       |
+| `phone`         | string?    | No       |
+| `office`        | string?    | No       |
 
 - **Response** (`StaffResponse`)
 
@@ -2271,36 +2319,36 @@ List students.
 - **Permission:** `students.view`
 - **Query Parameters:**
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `department_id` | UUID? | null | Scoped for DEPARTMENT role |
-| `programme_id` | UUID? | null | |
-| `level` | int? | null | |
-| `search` | string? | null | |
-| `page` | int | 1 | |
-| `page_size` | int | 25 (max 100) | |
+| Param           | Type    | Default      | Notes                      |
+| --------------- | ------- | ------------ | -------------------------- |
+| `department_id` | UUID?   | null         | Scoped for DEPARTMENT role |
+| `programme_id`  | UUID?   | null         |                            |
+| `level`         | int?    | null         |                            |
+| `search`        | string? | null         |                            |
+| `page`          | int     | 1            |                            |
+| `page_size`     | int     | 25 (max 100) |                            |
 
 - **Response** (`StudentListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | StudentResponse[] |
+| Field  | Type                      |
+| ------ | ------------------------- |
+| `data` | StudentResponse[]         |
 | `meta` | `{page, pageSize, total}` |
 
 `StudentResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `name` | string |
-| `email` | string |
-| `student_number` | string? |
-| `programme_id` | UUID? |
-| `programme_name` | string? |
-| `level` | int? |
+| Field              | Type             |
+| ------------------ | ---------------- |
+| `id`               | UUID             |
+| `name`             | string           |
+| `email`            | string           |
+| `student_number`   | string?          |
+| `programme_id`     | UUID?            |
+| `programme_name`   | string?          |
+| `level`            | int?             |
 | `student_category` | StudentCategory? |
-| `status` | UserStatus |
-| `created_at` | datetime |
+| `status`           | UserStatus       |
+| `created_at`       | datetime         |
 
 ---
 
@@ -2311,24 +2359,24 @@ List student cohorts (programme + level groups).
 - **Permission:** `students.view`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `department_id` | UUID? | null |
+| Param           | Type  | Default |
+| --------------- | ----- | ------- |
+| `department_id` | UUID? | null    |
 
 - **Response** (`CohortListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type             |
+| ------ | ---------------- |
 | `data` | CohortResponse[] |
 
 `CohortResponse`:
 
-| Field | Type |
-|-------|------|
-| `programme_id` | UUID |
+| Field            | Type   |
+| ---------------- | ------ |
+| `programme_id`   | UUID   |
 | `programme_name` | string |
-| `level` | int |
-| `student_count` | int |
+| `level`          | int    |
+| `student_count`  | int    |
 
 ---
 
@@ -2343,34 +2391,34 @@ List sections.
 - **Permission:** `students.manage`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `programme_id` | UUID? | null |
-| `level` | int? | null |
-| `course_id` | UUID? | null |
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param          | Type  | Default      |
+| -------------- | ----- | ------------ |
+| `programme_id` | UUID? | null         |
+| `level`        | int?  | null         |
+| `course_id`    | UUID? | null         |
+| `page`         | int   | 1            |
+| `page_size`    | int   | 25 (max 100) |
 
 - **Response** (`SectionListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | SectionResponse[] |
+| Field  | Type               |
+| ------ | ------------------ |
+| `data` | SectionResponse[]  |
 | `meta` | `{page, pageSize}` |
 
 `SectionResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `programme_id` | UUID |
-| `level` | int |
-| `name` | string |
-| `course_id` | UUID? |
-| `student_ids` | UUID[] |
-| `student_count` | int |
-| `created_at` | datetime |
-| `updated_at` | datetime |
+| Field           | Type     |
+| --------------- | -------- |
+| `id`            | UUID     |
+| `programme_id`  | UUID     |
+| `level`         | int      |
+| `name`          | string   |
+| `course_id`     | UUID?    |
+| `student_ids`   | UUID[]   |
+| `student_count` | int      |
+| `created_at`    | datetime |
+| `updated_at`    | datetime |
 
 ---
 
@@ -2391,13 +2439,13 @@ Create section.
 - **Permission:** `students.manage`
 - **Request Body** (`SectionCreate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `programme_id` | UUID | Yes |
-| `level` | int | Yes (min 100) |
-| `name` | string | Yes (max 100) |
-| `course_id` | UUID? | No |
-| `student_ids` | UUID[]? | No |
+| Field          | Type    | Required      |
+| -------------- | ------- | ------------- |
+| `programme_id` | UUID    | Yes           |
+| `level`        | int     | Yes (min 100) |
+| `name`         | string  | Yes (max 100) |
+| `course_id`    | UUID?   | No            |
+| `student_ids`  | UUID[]? | No            |
 
 - **Response** (`SectionResponse`)
 - **Status:** 201 Created
@@ -2412,10 +2460,10 @@ Update section.
 - **Path Parameters:** `section_id` (UUID)
 - **Request Body** (`SectionUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `name` | string? | No |
-| `student_ids` | UUID[]? | No |
+| Field         | Type    | Required |
+| ------------- | ------- | -------- |
+| `name`        | string? | No       |
+| `student_ids` | UUID[]? | No       |
 
 - **Response** (`SectionResponse`)
 
@@ -2442,9 +2490,9 @@ Get courses assigned to the current lecturer.
 - **Permission:** Authenticated user (LECTURER role only)
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID? | No |
+| Param         | Type  | Required |
+| ------------- | ----- | -------- |
+| `semester_id` | UUID? | No       |
 
 - **Response:**
 
@@ -2474,9 +2522,9 @@ Get students registered for a lecturer's course.
 - **Permission:** Authenticated user (LECTURER role only)
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `course_id` | UUID | Yes |
+| Param       | Type | Required |
+| ----------- | ---- | -------- |
+| `course_id` | UUID | Yes      |
 
 - **Response:**
 
@@ -2513,37 +2561,91 @@ List current student's course registrations.
 - **Permission:** `registration.self`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `semester_id` | UUID? | null |
-| `page` | int | 1 |
-| `page_size` | int | 50 (max 100) |
+| Param         | Type  | Default      |
+| ------------- | ----- | ------------ |
+| `semester_id` | UUID? | null         |
+| `page`        | int   | 1            |
+| `page_size`   | int   | 50 (max 100) |
 
 - **Response** (`RegistrationListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | RegistrationResponse[] |
+| Field  | Type                                     |
+| ------ | ---------------------------------------- |
+| `data` | RegistrationResponse[]                   |
 | `meta` | `{page, pageSize, counts, totalCredits}` |
 
 `RegistrationResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `student_id` | UUID |
-| `course_id` | UUID? |
-| `course_code` | string? |
-| `course_title` | string? |
-| `custom_course_code` | string? |
-| `custom_course_title` | string? |
-| `semester_id` | UUID |
-| `level` | int |
-| `registration_type` | RegistrationType |
-| `credits` | int |
-| `status` | RegistrationStatus |
-| `source` | string? |
-| `created_at` | datetime |
+| Field                 | Type               |
+| --------------------- | ------------------ |
+| `id`                  | UUID               |
+| `student_id`          | UUID               |
+| `course_id`           | UUID?              |
+| `course_code`         | string?            |
+| `course_title`        | string?            |
+| `custom_course_code`  | string?            |
+| `custom_course_title` | string?            |
+| `semester_id`         | UUID               |
+| `level`               | int                |
+| `registration_type`   | RegistrationType   |
+| `credits`             | int                |
+| `status`              | RegistrationStatus |
+| `source`              | string?            |
+| `created_at`          | datetime           |
+
+---
+
+### GET `/api/v1/me/registrations/{registration_id}`
+
+Get detailed information about a single course registration, including course details, lecturer info, department, cohorts, and matching timetable entries.
+
+- **Permission:** `registration.self`
+- **Path Parameters:** `registration_id` (UUID)
+- **Response** (`RegistrationDetailResponse`):
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | UUID | |
+| `student_id` | UUID | |
+| `course_id` | UUID? | |
+| `course_code` | string? | |
+| `course_title` | string? | |
+| `custom_course_code` | string? | |
+| `custom_course_title` | string? | |
+| `semester_id` | UUID | |
+| `level` | int | |
+| `registration_type` | RegistrationType | |
+| `credits` | int | |
+| `status` | RegistrationStatus | |
+| `source` | string? | |
+| `created_at` | datetime | |
+| `course_type` | string? | e.g. `"Core"`, `"Elective"` |
+| `course_mode` | string? | e.g. `"in-person"`, `"online"`, `"hybrid"` |
+| `credit_hours` | int? | From the course record |
+| `student_count` | int? | Enrolled student count |
+| `lecturer_id` | UUID? | |
+| `lecturer_name` | string? | |
+| `lecturer_email` | string? | |
+| `lecturer_office` | string? | |
+| `department_id` | UUID? | |
+| `department_name` | string? | |
+| `department_code` | string? | |
+| `cohorts` | object[] | `[{programme_id, level}]` |
+| `timetable_entries` | TimetableEntry[] | Master timetable slots for this course |
+
+`TimetableEntry`:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | UUID | |
+| `day` | int | 0=Monday ... 6=Sunday |
+| `day_name` | string? | e.g. `"Monday"` |
+| `period` | int | Period index (0-based) |
+| `period_start` | string | e.g. `"07:30"` |
+| `period_end` | string | e.g. `"08:20"` |
+| `venue_code` | string | |
+| `course_kind` | string? | `"C"` or `"E"` |
+| `source` | string | `"master"` or `"department"` |
 
 ---
 
@@ -2554,29 +2656,29 @@ Get available courses catalogue for registration.
 - **Permission:** `registration.self`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `semester_id` | UUID | Yes |
+| Param         | Type | Required |
+| ------------- | ---- | -------- |
+| `semester_id` | UUID | Yes      |
 
 - **Response** (`CatalogueListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                      |
+| ------ | ------------------------- |
 | `data` | CatalogueCourseResponse[] |
 
 `CatalogueCourseResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `code` | string |
-| `title` | string |
-| `department_id` | UUID |
-| `department_name` | string? |
-| `course_type` | string |
-| `credit_hours` | int |
-| `mode` | string |
-| `lecturer_name` | string? |
+| Field                | Type    |
+| -------------------- | ------- |
+| `id`                 | UUID    |
+| `code`               | string  |
+| `title`              | string  |
+| `department_id`      | UUID    |
+| `department_name`    | string? |
+| `course_type`        | string  |
+| `credit_hours`       | int     |
+| `mode`               | string  |
+| `lecturer_name`      | string? |
 | `is_programme_match` | boolean |
 
 ---
@@ -2588,15 +2690,15 @@ Register for a course.
 - **Permission:** `registration.self`
 - **Request Body** (`RegistrationCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `course_id` | UUID? | No | One of course_id or custom fields |
-| `custom_course_code` | string? | No | max 50 |
-| `custom_course_title` | string? | No | max 255 |
-| `semester_id` | UUID | Yes | |
-| `level` | int | Yes | min 100 |
-| `registration_type` | RegistrationType | Yes | |
-| `credits` | int | Yes | 1-6 |
+| Field                 | Type             | Required | Notes                             |
+| --------------------- | ---------------- | -------- | --------------------------------- |
+| `course_id`           | UUID?            | No       | One of course_id or custom fields |
+| `custom_course_code`  | string?          | No       | max 50                            |
+| `custom_course_title` | string?          | No       | max 255                           |
+| `semester_id`         | UUID             | Yes      |                                   |
+| `level`               | int              | Yes      | min 100                           |
+| `registration_type`   | RegistrationType | Yes      |                                   |
+| `credits`             | int              | Yes      | 1-6                               |
 
 - **Response** (`RegistrationResponse`)
 - **Status:** 201 Created
@@ -2625,38 +2727,38 @@ Import students from CSV file.
 - **Content-Type:** `multipart/form-data`
 - **Form Data:**
 
-| Field | Type | Required |
-|-------|------|----------|
-| `file` | UploadFile (.csv) | Yes |
-| `student_category` | string | Yes |
-| `academic_year` | string | Yes |
-| `programme_id` | UUID? | No |
-| `level` | int? | No |
+| Field              | Type              | Required |
+| ------------------ | ----------------- | -------- |
+| `file`             | UploadFile (.csv) | Yes      |
+| `student_category` | string            | Yes      |
+| `academic_year`    | string            | Yes      |
+| `programme_id`     | UUID?             | No       |
+| `level`            | int?              | No       |
 
 - **Response** (`ImportResponse`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `kind` | string |
-| `department_id` | UUID |
-| `course_id` | UUID? |
-| `programme_id` | UUID? |
-| `programme_text` | string? |
-| `level_text` | string? |
-| `student_category` | string? |
-| `academic_year` | string? |
-| `semester_id` | UUID? |
-| `filename` | string |
-| `file_url` | string? |
-| `row_count` | int? |
-| `created_count` | int |
-| `updated_count` | int |
-| `warning_count` | int |
-| `error_count` | int |
-| `status` | string |
-| `created_by_id` | UUID |
-| `created_at` | datetime |
+| Field              | Type     |
+| ------------------ | -------- |
+| `id`               | UUID     |
+| `kind`             | string   |
+| `department_id`    | UUID     |
+| `course_id`        | UUID?    |
+| `programme_id`     | UUID?    |
+| `programme_text`   | string?  |
+| `level_text`       | string?  |
+| `student_category` | string?  |
+| `academic_year`    | string?  |
+| `semester_id`      | UUID?    |
+| `filename`         | string   |
+| `file_url`         | string?  |
+| `row_count`        | int?     |
+| `created_count`    | int      |
+| `updated_count`    | int      |
+| `warning_count`    | int      |
+| `error_count`      | int      |
+| `status`           | string   |
+| `created_by_id`    | UUID     |
+| `created_at`       | datetime |
 
 - **Status:** 201 Created
 
@@ -2670,13 +2772,13 @@ Import course roster from CSV file.
 - **Content-Type:** `multipart/form-data`
 - **Form Data:**
 
-| Field | Type | Required |
-|-------|------|----------|
-| `file` | UploadFile (.csv) | Yes |
-| `course_id` | UUID | Yes |
-| `student_category` | string | Yes |
-| `academic_year` | string | Yes |
-| `semester_id` | UUID | Yes |
+| Field              | Type              | Required |
+| ------------------ | ----------------- | -------- |
+| `file`             | UploadFile (.csv) | Yes      |
+| `course_id`        | UUID              | Yes      |
+| `student_category` | string            | Yes      |
+| `academic_year`    | string            | Yes      |
+| `semester_id`      | UUID              | Yes      |
 
 - **Response** (`ImportResponse`): Same as student import response.
 - **Status:** 201 Created
@@ -2690,17 +2792,17 @@ List imports.
 - **Permission:** `imports.view`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `kind` | string? | null |
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param       | Type    | Default      |
+| ----------- | ------- | ------------ |
+| `kind`      | string? | null         |
+| `page`      | int     | 1            |
+| `page_size` | int     | 25 (max 100) |
 
 - **Response** (`ImportListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | ImportResponse[] |
+| Field  | Type               |
+| ------ | ------------------ |
+| `data` | ImportResponse[]   |
 | `meta` | `{page, pageSize}` |
 
 ---
@@ -2723,28 +2825,28 @@ Get import row details.
 - **Path Parameters:** `import_id` (UUID)
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `page` | int | 1 |
-| `page_size` | int | 100 (max 500) |
+| Param       | Type | Default       |
+| ----------- | ---- | ------------- |
+| `page`      | int  | 1             |
+| `page_size` | int  | 100 (max 500) |
 
 - **Response** (`ImportRowListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                |
+| ------ | ------------------- |
 | `data` | ImportRowResponse[] |
-| `meta` | `{page, pageSize}` |
+| `meta` | `{page, pageSize}`  |
 
 `ImportRowResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `import_id` | UUID |
-| `row_number` | int |
-| `raw` | object? |
-| `outcome` | string? |
-| `message` | string? |
+| Field        | Type    |
+| ------------ | ------- |
+| `id`         | UUID    |
+| `import_id`  | UUID    |
+| `row_number` | int     |
+| `raw`        | object? |
+| `outcome`    | string? |
+| `message`    | string? |
 
 ---
 
@@ -2759,41 +2861,41 @@ List attendance sessions.
 - **Permission:** `attendance.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `status` | string? | No |
-| `course_id` | UUID? | No |
-| `department_id` | UUID? | No |
-| `date` | string? | No |
+| Param           | Type    | Required |
+| --------------- | ------- | -------- |
+| `status`        | string? | No       |
+| `course_id`     | UUID?   | No       |
+| `department_id` | UUID?   | No       |
+| `date`          | string? | No       |
 
 - **Response** (`AttendanceSessionListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                        |
+| ------ | --------------------------- |
 | `data` | AttendanceSessionResponse[] |
-| `meta` | object |
+| `meta` | object                      |
 
 `AttendanceSessionResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `course_id` | UUID |
-| `schedule_item_id` | UUID? |
-| `lecturer_id` | UUID |
-| `date` | string |
-| `start_time` | string |
-| `end_time` | string |
-| `venue_code` | string? |
-| `status` | string |
-| `opened_at` | datetime? |
-| `closed_at` | datetime? |
-| `expected_count` | int |
-| `present_count` | int |
-| `late_count` | int |
-| `absent_count` | int |
-| `excused_count` | int |
-| `rate` | float |
+| Field              | Type      |
+| ------------------ | --------- |
+| `id`               | UUID      |
+| `course_id`        | UUID      |
+| `schedule_item_id` | UUID?     |
+| `lecturer_id`      | UUID      |
+| `date`             | string    |
+| `start_time`       | string    |
+| `end_time`         | string    |
+| `venue_code`       | string?   |
+| `status`           | string    |
+| `opened_at`        | datetime? |
+| `closed_at`        | datetime? |
+| `expected_count`   | int       |
+| `present_count`    | int       |
+| `late_count`       | int       |
+| `absent_count`     | int       |
+| `excused_count`    | int       |
+| `rate`             | float     |
 
 ---
 
@@ -2804,14 +2906,14 @@ Create attendance session.
 - **Permission:** `attendance.record`
 - **Request Body** (`AttendanceSessionCreate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `course_id` | UUID | Yes |
-| `schedule_item_id` | UUID? | No |
-| `date` | string | Yes |
-| `start_time` | string | Yes |
-| `end_time` | string | Yes |
-| `venue_code` | string? | No |
+| Field              | Type    | Required |
+| ------------------ | ------- | -------- |
+| `course_id`        | UUID    | Yes      |
+| `schedule_item_id` | UUID?   | No       |
+| `date`             | string  | Yes      |
+| `start_time`       | string  | Yes      |
+| `end_time`         | string  | Yes      |
+| `venue_code`       | string? | No       |
 
 - **Response** (`AttendanceSessionResponse`)
 - **Status:** 201 Created
@@ -2865,27 +2967,27 @@ Create manual attendance record.
 - **Permission:** `attendance.record`
 - **Request Body** (`AttendanceRecordCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `session_id` | UUID? | No | |
-| `course_id` | UUID? | No | |
-| `session_date` | string? | No | |
-| `student_id` | UUID | Yes | |
-| `status` | string | No | default "Present" |
-| `note` | string? | No | |
+| Field          | Type    | Required | Notes             |
+| -------------- | ------- | -------- | ----------------- |
+| `session_id`   | UUID?   | No       |                   |
+| `course_id`    | UUID?   | No       |                   |
+| `session_date` | string? | No       |                   |
+| `student_id`   | UUID    | Yes      |                   |
+| `status`       | string  | No       | default "Present" |
+| `note`         | string? | No       |                   |
 
 - **Response** (`AttendanceRecordResponse`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `session_id` | UUID |
-| `course_id` | UUID |
-| `student_id` | UUID |
-| `status` | string |
-| `source` | string |
+| Field         | Type     |
+| ------------- | -------- |
+| `id`          | UUID     |
+| `session_id`  | UUID     |
+| `course_id`   | UUID     |
+| `student_id`  | UUID     |
+| `status`      | string   |
+| `source`      | string   |
 | `recorded_at` | datetime |
-| `note` | string? |
+| `note`        | string?  |
 
 - **Status:** 201 Created
 
@@ -2909,12 +3011,12 @@ List attendance records.
 - **Permission:** `attendance.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `course_id` | UUID? | No |
-| `student_id` | UUID? | No |
-| `from_date` | string? | No |
-| `to_date` | string? | No |
+| Param        | Type    | Required |
+| ------------ | ------- | -------- |
+| `course_id`  | UUID?   | No       |
+| `student_id` | UUID?   | No       |
+| `from_date`  | string? | No       |
+| `to_date`    | string? | No       |
 
 - **Response:** Attendance records data
 
@@ -2928,10 +3030,10 @@ Update an attendance record.
 - **Path Parameters:** `record_id` (UUID)
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `record_status` | string? | No |
-| `note` | string? | No |
+| Param           | Type    | Required |
+| --------------- | ------- | -------- |
+| `record_status` | string? | No       |
+| `note`          | string? | No       |
 
 - **Response:** `{"data": {"id": "UUID", "status": "...", "note": "..."}}`
 
@@ -2944,11 +3046,11 @@ Export attendance records as CSV.
 - **Permission:** `attendance.manage`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `scope` | string | "department" |
-| `department_id` | UUID? | null |
-| `course_id` | UUID? | null |
+| Param           | Type   | Default      |
+| --------------- | ------ | ------------ |
+| `scope`         | string | "department" |
+| `department_id` | UUID?  | null         |
+| `course_id`     | UUID?  | null         |
 
 - **Response:** CSV file download
 
@@ -2965,45 +3067,45 @@ List assessments.
 - **Permission:** `assessments.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `status` | string? | No |
-| `scope` | string? | No |
-| `course_id` | UUID? | No |
-| `search` | string? | No |
+| Param       | Type    | Required |
+| ----------- | ------- | -------- |
+| `status`    | string? | No       |
+| `scope`     | string? | No       |
+| `course_id` | UUID?   | No       |
+| `search`    | string? | No       |
 
 - **Response** (`AssessmentListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                 |
+| ------ | -------------------- |
 | `data` | AssessmentResponse[] |
-| `meta` | object |
+| `meta` | object               |
 
 `AssessmentResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `course_id` | UUID? |
-| `course_code` | string |
-| `course_title` | string |
-| `department_id` | UUID |
-| `assessment_type` | string |
-| `delivery_mode` | string |
-| `date` | string |
-| `start_time` | string |
-| `end_time` | string |
-| `location` | string |
-| `venue_code` | string? |
-| `cohorts` | object[] |
-| `status` | string |
-| `scope` | string |
-| `is_shared` | boolean |
-| `created_by_id` | UUID |
-| `created_by_role` | string |
-| `review_comment` | string? |
-| `reviewed_by_id` | UUID? |
-| `reviewed_at` | datetime? |
+| Field             | Type      |
+| ----------------- | --------- |
+| `id`              | UUID      |
+| `course_id`       | UUID?     |
+| `course_code`     | string    |
+| `course_title`    | string    |
+| `department_id`   | UUID      |
+| `assessment_type` | string    |
+| `delivery_mode`   | string    |
+| `date`            | string    |
+| `start_time`      | string    |
+| `end_time`        | string    |
+| `location`        | string    |
+| `venue_code`      | string?   |
+| `cohorts`         | object[]  |
+| `status`          | string    |
+| `scope`           | string    |
+| `is_shared`       | boolean   |
+| `created_by_id`   | UUID      |
+| `created_by_role` | string    |
+| `review_comment`  | string?   |
+| `reviewed_by_id`  | UUID?     |
+| `reviewed_at`     | datetime? |
 
 ---
 
@@ -3015,22 +3117,22 @@ Create assessment.
 - **Query Parameters:** `save_as_draft` (boolean, default false)
 - **Request Body** (`AssessmentCreate`):
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `course_id` | UUID? | No | |
-| `course_code` | string | Yes | |
-| `course_title` | string | Yes | |
-| `department_id` | UUID | Yes | |
-| `assessment_type` | string | Yes | |
-| `delivery_mode` | string | Yes | |
-| `date` | string | Yes | |
-| `start_time` | string | Yes | |
-| `end_time` | string | Yes | |
-| `location` | string | Yes | |
-| `venue_code` | string? | No | |
-| `cohorts` | object[] | No | default [] |
-| `scope` | string | No | default "department" |
-| `is_shared` | boolean | No | default false |
+| Field             | Type     | Required | Notes                |
+| ----------------- | -------- | -------- | -------------------- |
+| `course_id`       | UUID?    | No       |                      |
+| `course_code`     | string   | Yes      |                      |
+| `course_title`    | string   | Yes      |                      |
+| `department_id`   | UUID     | Yes      |                      |
+| `assessment_type` | string   | Yes      |                      |
+| `delivery_mode`   | string   | Yes      |                      |
+| `date`            | string   | Yes      |                      |
+| `start_time`      | string   | Yes      |                      |
+| `end_time`        | string   | Yes      |                      |
+| `location`        | string   | Yes      |                      |
+| `venue_code`      | string?  | No       |                      |
+| `cohorts`         | object[] | No       | default []           |
+| `scope`           | string   | No       | default "department" |
+| `is_shared`       | boolean  | No       | default false        |
 
 - **Response** (`AssessmentResponse`)
 - **Status:** 201 Created
@@ -3117,10 +3219,10 @@ Export assessments as CSV.
 - **Permission:** `assessments.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `status` | string? | No |
-| `scope` | string? | No |
+| Param    | Type    | Required |
+| -------- | ------- | -------- |
+| `status` | string? | No       |
+| `scope`  | string? | No       |
 
 - **Response:** CSV file download
 
@@ -3138,36 +3240,36 @@ Create graduation submission (upload CSV of candidates).
 - **Content-Type:** `multipart/form-data`
 - **Form Data:**
 
-| Field | Type | Required |
-|-------|------|----------|
-| `file` | UploadFile (.csv) | Yes |
-| `student_category` | string | Yes |
-| `academic_year` | string | Yes |
-| `programme_id` | UUID? | No |
-| `programme_text` | string? | No |
-| `declared_count` | int | Yes |
+| Field              | Type              | Required |
+| ------------------ | ----------------- | -------- |
+| `file`             | UploadFile (.csv) | Yes      |
+| `student_category` | string            | Yes      |
+| `academic_year`    | string            | Yes      |
+| `programme_id`     | UUID?             | No       |
+| `programme_text`   | string?           | No       |
+| `declared_count`   | int               | Yes      |
 
 - **Response** (`GraduationSubmissionResponse`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `department_id` | UUID |
-| `department_name` | string? |
-| `programme_id` | UUID? |
-| `programme_text` | string? |
-| `student_category` | string |
-| `academic_year` | string |
-| `declared_count` | int |
-| `filename` | string |
-| `file_url` | string? |
-| `row_count` | int? |
-| `status` | GraduationStatus |
-| `review_comment` | string? |
-| `reviewed_by_id` | UUID? |
-| `reviewed_at` | datetime? |
-| `created_by_id` | UUID |
-| `created_at` | datetime |
+| Field              | Type             |
+| ------------------ | ---------------- |
+| `id`               | UUID             |
+| `department_id`    | UUID             |
+| `department_name`  | string?          |
+| `programme_id`     | UUID?            |
+| `programme_text`   | string?          |
+| `student_category` | string           |
+| `academic_year`    | string           |
+| `declared_count`   | int              |
+| `filename`         | string           |
+| `file_url`         | string?          |
+| `row_count`        | int?             |
+| `status`           | GraduationStatus |
+| `review_comment`   | string?          |
+| `reviewed_by_id`   | UUID?            |
+| `reviewed_at`      | datetime?        |
+| `created_by_id`    | UUID             |
+| `created_at`       | datetime         |
 
 - **Status:** 201 Created
 
@@ -3180,18 +3282,18 @@ List graduation submissions.
 - **Permission:** `graduation.view`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `status` | string? | null |
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param       | Type    | Default      |
+| ----------- | ------- | ------------ |
+| `status`    | string? | null         |
+| `page`      | int     | 1            |
+| `page_size` | int     | 25 (max 100) |
 
 - **Response** (`GraduationListResponse`):
 
-| Field | Type |
-|-------|------|
+| Field  | Type                           |
+| ------ | ------------------------------ |
 | `data` | GraduationSubmissionResponse[] |
-| `meta` | `{page, pageSize, counts}` |
+| `meta` | `{page, pageSize, counts}`     |
 
 ---
 
@@ -3205,23 +3307,23 @@ Get submission details with candidates.
 
 Extends `GraduationSubmissionResponse` with:
 
-| Field | Type |
-|-------|------|
+| Field        | Type                          |
+| ------------ | ----------------------------- |
 | `candidates` | GraduationCandidateResponse[] |
 
 `GraduationCandidateResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `submission_id` | UUID |
-| `student_number` | string |
-| `name` | string |
-| `programme` | string? |
-| `student_id` | UUID? |
-| `academic_clearance` | boolean? |
+| Field                 | Type     |
+| --------------------- | -------- |
+| `id`                  | UUID     |
+| `submission_id`       | UUID     |
+| `student_number`      | string   |
+| `name`                | string   |
+| `programme`           | string?  |
+| `student_id`          | UUID?    |
+| `academic_clearance`  | boolean? |
 | `financial_clearance` | boolean? |
-| `issues` | string[] |
+| `issues`              | string[] |
 
 ---
 
@@ -3233,10 +3335,10 @@ Update graduation candidate clearance status.
 - **Path Parameters:** `candidate_id` (UUID)
 - **Request Body** (`GraduationCandidateUpdate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `academic_clearance` | boolean? | No |
-| `financial_clearance` | boolean? | No |
+| Field                 | Type     | Required |
+| --------------------- | -------- | -------- |
+| `academic_clearance`  | boolean? | No       |
+| `financial_clearance` | boolean? | No       |
 
 - **Response** (`GraduationCandidateResponse`)
 
@@ -3283,23 +3385,23 @@ Get super admin dashboard metrics.
 - **Permission:** `reports.view`
 - **Response** (`SuperDashboardResponse`):
 
-| Field | Type |
-|-------|------|
-| `departments` | int |
-| `faculty` | int |
-| `assessments` | int |
-| `venues` | int |
-| `open_slots` | int |
-| `free_cells` | int |
-| `pending_approvals` | int |
-| `open_conflicts` | int |
-| `sessions_today` | int |
-| `live_sessions` | int |
-| `assessments_today` | int |
-| `ready_to_publish` | int |
-| `departments_not_submitted` | object[] |
-| `submission_window_closes_in_days` | int? |
-| `next_sessions` | ScheduleItemSummary[] |
+| Field                              | Type                  |
+| ---------------------------------- | --------------------- |
+| `departments`                      | int                   |
+| `faculty`                          | int                   |
+| `assessments`                      | int                   |
+| `venues`                           | int                   |
+| `open_slots`                       | int                   |
+| `free_cells`                       | int                   |
+| `pending_approvals`                | int                   |
+| `open_conflicts`                   | int                   |
+| `sessions_today`                   | int                   |
+| `live_sessions`                    | int                   |
+| `assessments_today`                | int                   |
+| `ready_to_publish`                 | int                   |
+| `departments_not_submitted`        | object[]              |
+| `submission_window_closes_in_days` | int?                  |
+| `next_sessions`                    | ScheduleItemSummary[] |
 
 ---
 
@@ -3310,16 +3412,16 @@ Get department dashboard metrics.
 - **Permission:** `reports.view`
 - **Response** (`DepartmentDashboardResponse`):
 
-| Field | Type |
-|-------|------|
-| `course_offerings` | int |
-| `faculty` | int |
-| `active_students` | int |
-| `schedule_requests` | int |
-| `readiness` | ReadinessMetrics? |
-| `central_slots_available` | int |
-| `submission_window_closes_in_days` | int? |
-| `attention` | AttentionItem[] |
+| Field                              | Type              |
+| ---------------------------------- | ----------------- |
+| `course_offerings`                 | int               |
+| `faculty`                          | int               |
+| `active_students`                  | int               |
+| `schedule_requests`                | int               |
+| `readiness`                        | ReadinessMetrics? |
+| `central_slots_available`          | int               |
+| `submission_window_closes_in_days` | int?              |
+| `attention`                        | AttentionItem[]   |
 
 ---
 
@@ -3330,20 +3432,20 @@ Get lecturer dashboard metrics.
 - **Permission:** Authenticated user (LECTURER or SUPER)
 - **Response** (`LecturerDashboardResponse`):
 
-| Field | Type |
-|-------|------|
-| `classes_today` | int |
-| `assigned_courses` | int |
-| `students_reached` | int |
-| `attendance_rate` | float |
-| `attendance_trend` | float[] |
-| `today_timeline` | TodayTimelineItem[] |
-| `contact_hours` | float |
-| `workload_percent` | float |
-| `teaching_groups` | int |
-| `recent_registers` | RecentRegister[] |
-| `attendance_health` | AttendanceHealth? |
-| `next_session_starts_in_minutes` | int? |
+| Field                            | Type                |
+| -------------------------------- | ------------------- |
+| `classes_today`                  | int                 |
+| `assigned_courses`               | int                 |
+| `students_reached`               | int                 |
+| `attendance_rate`                | float               |
+| `attendance_trend`               | float[]             |
+| `today_timeline`                 | TodayTimelineItem[] |
+| `contact_hours`                  | float               |
+| `workload_percent`               | float               |
+| `teaching_groups`                | int                 |
+| `recent_registers`               | RecentRegister[]    |
+| `attendance_health`              | AttendanceHealth?   |
+| `next_session_starts_in_minutes` | int?                |
 
 ---
 
@@ -3354,13 +3456,13 @@ Get student dashboard metrics.
 - **Permission:** Authenticated user (STUDENT or SUPER)
 - **Response** (`StudentDashboardResponse`):
 
-| Field | Type |
-|-------|------|
-| `classes_today` | int |
-| `registered_courses` | int |
-| `assessments_soon` | int |
-| `attendance_rate` | float |
-| `today` | TodayTimelineItem[] |
+| Field                | Type                |
+| -------------------- | ------------------- |
+| `classes_today`      | int                 |
+| `registered_courses` | int                 |
+| `assessments_soon`   | int                 |
+| `attendance_rate`    | float               |
+| `today`              | TodayTimelineItem[] |
 
 ---
 
@@ -3371,11 +3473,11 @@ Get notification badges/counts for the current user.
 - **Permission:** Authenticated user
 - **Response** (`BadgesResponse`):
 
-| Field | Type |
-|-------|------|
-| `approvals` | int |
-| `conflict_centre` | int |
-| `schedule_requests` | int |
+| Field               | Type |
+| ------------------- | ---- |
+| `approvals`         | int  |
+| `conflict_centre`   | int  |
+| `schedule_requests` | int  |
 
 ---
 
@@ -3390,30 +3492,30 @@ Generate a report.
 - **Permission:** `reports.generate`
 - **Request Body** (`ReportCreate`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `report_type` | string | Yes |
-| `academic_year` | string? | No |
-| `semester` | string? | No |
-| `programme_id` | UUID? | No |
-| `student_category` | string? | No |
-| `date_from` | datetime? | No |
-| `date_to` | datetime? | No |
-| `format` | string | No (default "csv") |
-| `department_id` | UUID? | No |
+| Field              | Type      | Required           |
+| ------------------ | --------- | ------------------ |
+| `report_type`      | string    | Yes                |
+| `academic_year`    | string?   | No                 |
+| `semester`         | string?   | No                 |
+| `programme_id`     | UUID?     | No                 |
+| `student_category` | string?   | No                 |
+| `date_from`        | datetime? | No                 |
+| `date_to`          | datetime? | No                 |
+| `format`           | string    | No (default "csv") |
+| `department_id`    | UUID?     | No                 |
 
 - **Response** (`ReportResponse`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `report_type` | string |
-| `academic_year` | string? |
-| `semester` | string? |
-| `status` | string |
-| `file_url` | string? |
-| `row_count` | int? |
-| `created_at` | datetime? |
+| Field           | Type      |
+| --------------- | --------- |
+| `id`            | UUID      |
+| `report_type`   | string    |
+| `academic_year` | string?   |
+| `semester`      | string?   |
+| `status`        | string    |
+| `file_url`      | string?   |
+| `row_count`     | int?      |
+| `created_at`    | datetime? |
 
 - **Status:** 201 Created
 
@@ -3426,16 +3528,16 @@ List reports.
 - **Permission:** `reports.view`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param       | Type | Default      |
+| ----------- | ---- | ------------ |
+| `page`      | int  | 1            |
+| `page_size` | int  | 25 (max 100) |
 
 - **Response** (`ReportListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | ReportResponse[] |
+| Field  | Type                |
+| ------ | ------------------- |
+| `data` | ReportResponse[]    |
 | `meta` | `{page, page_size}` |
 
 ---
@@ -3461,45 +3563,45 @@ List audit logs.
 - **Permission:** `audit.view`
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `category` | string? | null |
-| `actor_id` | UUID? | null |
-| `entity_type` | string? | null |
-| `from_date` | datetime? | null |
-| `to_date` | datetime? | null |
-| `search` | string? | null |
-| `page` | int | 1 |
-| `page_size` | int | 25 (max 100) |
+| Param         | Type      | Default      |
+| ------------- | --------- | ------------ |
+| `category`    | string?   | null         |
+| `actor_id`    | UUID?     | null         |
+| `entity_type` | string?   | null         |
+| `from_date`   | datetime? | null         |
+| `to_date`     | datetime? | null         |
+| `search`      | string?   | null         |
+| `page`        | int       | 1            |
+| `page_size`   | int       | 25 (max 100) |
 
 - **Response** (`AuditLogListResponse`):
 
-| Field | Type |
-|-------|------|
-| `data` | AuditLogResponse[] |
+| Field  | Type                              |
+| ------ | --------------------------------- |
+| `data` | AuditLogResponse[]                |
 | `meta` | `{page, pageSize, total, counts}` |
 
 `AuditLogResponse`:
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `user_id` | UUID |
-| `actor_name` | string |
-| `actor_role` | string |
-| `action` | string |
-| `category` | string |
-| `entity_type` | string? |
-| `entity_id` | UUID? |
-| `department_id` | UUID? |
-| `summary` | string |
-| `before` | object? |
-| `after` | object? |
-| `reason` | string? |
-| `ip_address` | string? |
-| `user_agent` | string? |
-| `revision` | int? |
-| `created_at` | datetime? |
+| Field           | Type      |
+| --------------- | --------- |
+| `id`            | UUID      |
+| `user_id`       | UUID      |
+| `actor_name`    | string    |
+| `actor_role`    | string    |
+| `action`        | string    |
+| `category`      | string    |
+| `entity_type`   | string?   |
+| `entity_id`     | UUID?     |
+| `department_id` | UUID?     |
+| `summary`       | string    |
+| `before`        | object?   |
+| `after`         | object?   |
+| `reason`        | string?   |
+| `ip_address`    | string?   |
+| `user_agent`    | string?   |
+| `revision`      | int?      |
+| `created_at`    | datetime? |
 
 ---
 
@@ -3510,11 +3612,11 @@ Export audit logs as CSV.
 - **Permission:** `audit.view`
 - **Query Parameters:**
 
-| Param | Type | Required |
-|-------|------|----------|
-| `category` | string? | No |
-| `from_date` | datetime? | No |
-| `to_date` | datetime? | No |
+| Param       | Type      | Required |
+| ----------- | --------- | -------- |
+| `category`  | string?   | No       |
+| `from_date` | datetime? | No       |
+| `to_date`   | datetime? | No       |
 
 - **Response:** CSV file download
 
@@ -3531,28 +3633,28 @@ Get user notifications.
 - **Permission:** Authenticated user
 - **Query Parameters:**
 
-| Param | Type | Default |
-|-------|------|---------|
-| `unread_only` | boolean | false |
+| Param         | Type    | Default |
+| ------------- | ------- | ------- |
+| `unread_only` | boolean | false   |
 
 - **Response** (`NotificationResponse[]`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `recipient_id` | UUID? |
-| `title` | string |
-| `detail` | string |
-| `page` | string? |
-| `category` | NotificationCategory |
-| `priority` | NotificationPriority |
-| `audience_role` | string? |
-| `audience_department_id` | UUID? |
-| `entity_type` | string? |
-| `entity_id` | UUID? |
-| `created_at` | datetime |
-| `is_read` | boolean |
-| `read_at` | datetime? |
+| Field                    | Type                 |
+| ------------------------ | -------------------- |
+| `id`                     | UUID                 |
+| `recipient_id`           | UUID?                |
+| `title`                  | string               |
+| `detail`                 | string               |
+| `page`                   | string?              |
+| `category`               | NotificationCategory |
+| `priority`               | NotificationPriority |
+| `audience_role`          | string?              |
+| `audience_department_id` | UUID?                |
+| `entity_type`            | string?              |
+| `entity_id`              | UUID?                |
+| `created_at`             | datetime             |
+| `is_read`                | boolean              |
+| `read_at`                | datetime?            |
 
 ---
 
@@ -3572,9 +3674,9 @@ Mark specific notifications as read.
 - **Permission:** Authenticated user
 - **Request Body** (`NotificationMarkRead`):
 
-| Field | Type | Required |
-|-------|------|----------|
-| `notification_ids` | UUID[] | Yes |
+| Field              | Type   | Required |
+| ------------------ | ------ | -------- |
+| `notification_ids` | UUID[] | Yes      |
 
 - **Status:** 204 No Content
 
@@ -3600,34 +3702,34 @@ Get institution-wide settings.
 - **Permission:** `settings.institution`
 - **Response** (`InstitutionSettingsResponse`):
 
-| Field | Type | Default |
-|-------|------|---------|
-| `id` | UUID | |
-| `organisation_name` | string | |
-| `support_email` | string | |
-| `office_location` | string? | |
-| `timezone` | string | "Africa/Accra" |
-| `active_semester_id` | UUID? | |
-| `teaching_start` | string | "08:00" |
-| `teaching_end` | string | "18:00" |
-| `default_class_duration` | int | 60 |
-| `capacity_tolerance` | int | 0 |
-| `allow_weekends` | boolean | false |
-| `require_conflict_approval` | boolean | false |
-| `auto_publish_approved` | boolean | false |
-| `require_graduation_approval` | boolean | false |
-| `require_academic_clearance` | boolean | false |
-| `require_financial_clearance` | boolean | false |
-| `notify_schedule_changes` | boolean | true |
-| `notify_graduation_submissions` | boolean | true |
-| `notify_conflicts` | boolean | true |
-| `email_channel` | boolean | true |
-| `in_app_channel` | boolean | true |
-| `require_admin_two_factor` | boolean | false |
-| `session_timeout` | int | 30 |
-| `audit_retention` | string | "1 year" |
-| `created_at` | datetime? | |
-| `updated_at` | datetime? | |
+| Field                           | Type      | Default        |
+| ------------------------------- | --------- | -------------- |
+| `id`                            | UUID      |                |
+| `organisation_name`             | string    |                |
+| `support_email`                 | string    |                |
+| `office_location`               | string?   |                |
+| `timezone`                      | string    | "Africa/Accra" |
+| `active_semester_id`            | UUID?     |                |
+| `teaching_start`                | string    | "08:00"        |
+| `teaching_end`                  | string    | "18:00"        |
+| `default_class_duration`        | int       | 60             |
+| `capacity_tolerance`            | int       | 0              |
+| `allow_weekends`                | boolean   | false          |
+| `require_conflict_approval`     | boolean   | false          |
+| `auto_publish_approved`         | boolean   | false          |
+| `require_graduation_approval`   | boolean   | false          |
+| `require_academic_clearance`    | boolean   | false          |
+| `require_financial_clearance`   | boolean   | false          |
+| `notify_schedule_changes`       | boolean   | true           |
+| `notify_graduation_submissions` | boolean   | true           |
+| `notify_conflicts`              | boolean   | true           |
+| `email_channel`                 | boolean   | true           |
+| `in_app_channel`                | boolean   | true           |
+| `require_admin_two_factor`      | boolean   | false          |
+| `session_timeout`               | int       | 30             |
+| `audit_retention`               | string    | "1 year"       |
+| `created_at`                    | datetime? |                |
+| `updated_at`                    | datetime? |                |
 
 ---
 
@@ -3648,35 +3750,35 @@ Get department-specific settings.
 - **Permission:** `settings.department`
 - **Query Parameters:**
 
-| Param | Type | Required | Notes |
-|-------|------|----------|-------|
-| `department_id` | UUID? | No | Super admins can specify any; others use their own |
+| Param           | Type  | Required | Notes                                              |
+| --------------- | ----- | -------- | -------------------------------------------------- |
+| `department_id` | UUID? | No       | Super admins can specify any; others use their own |
 
 - **Response** (`DepartmentSettingsResponse`):
 
-| Field | Type |
-|-------|------|
-| `id` | UUID |
-| `department_id` | UUID |
-| `department_name` | string |
-| `department_code` | string |
-| `support_email` | string? |
-| `office_location` | string? |
-| `timezone` | string? |
-| `teaching_start` | string? |
-| `teaching_end` | string? |
-| `default_class_duration` | int? |
-| `capacity_tolerance` | int? |
-| `allow_weekends` | boolean? |
-| `require_conflict_approval` | boolean? |
-| `auto_publish_approved` | boolean? |
-| `notify_schedule_changes` | boolean? |
-| `notify_graduation_submissions` | boolean? |
-| `notify_conflicts` | boolean? |
-| `email_channel` | boolean? |
-| `in_app_channel` | boolean? |
-| `created_at` | datetime? |
-| `updated_at` | datetime? |
+| Field                           | Type      |
+| ------------------------------- | --------- |
+| `id`                            | UUID      |
+| `department_id`                 | UUID      |
+| `department_name`               | string    |
+| `department_code`               | string    |
+| `support_email`                 | string?   |
+| `office_location`               | string?   |
+| `timezone`                      | string?   |
+| `teaching_start`                | string?   |
+| `teaching_end`                  | string?   |
+| `default_class_duration`        | int?      |
+| `capacity_tolerance`            | int?      |
+| `allow_weekends`                | boolean?  |
+| `require_conflict_approval`     | boolean?  |
+| `auto_publish_approved`         | boolean?  |
+| `notify_schedule_changes`       | boolean?  |
+| `notify_graduation_submissions` | boolean?  |
+| `notify_conflicts`              | boolean?  |
+| `email_channel`                 | boolean?  |
+| `in_app_channel`                | boolean?  |
+| `created_at`                    | datetime? |
+| `updated_at`                    | datetime? |
 
 ---
 
@@ -3746,49 +3848,49 @@ Reset demo workspace. Only available when `DEMO_MODE=true` in server config. Tru
 
 ## Appendix: Permission Codes Reference
 
-| Code | Description |
-|------|-------------|
-| `users.manage` | Manage user accounts (admin) |
-| `roles.manage` | Manage roles and permissions |
-| `departments.view` | View departments |
-| `departments.manage` | Create/update/delete departments |
-| `programmes.view` | View programmes |
-| `programmes.manage` | Create/update/delete programmes |
-| `courses.view` | View courses |
-| `courses.manage` | Create/update/delete courses |
-| `venues.view` | View venues |
-| `venues.manage` | Create/update/delete venues |
-| `timetable.view` | View master timetables |
-| `timetable.upload` | Upload master timetables |
-| `timetable.department_upload` | Upload department timetables |
-| `timetable.edit` | Edit master timetable entries |
-| `schedule.view` | View schedule items and slot requests |
-| `schedule.request` | Submit slot requests |
-| `schedule.withdraw` | Withdraw slot requests |
-| `schedule.approve` | Approve/return slot requests |
-| `schedule.manage` | Manage schedule items |
-| `conflicts.view` | View conflict centre |
-| `conflicts.override` | Override conflicts |
-| `staff.view` | View faculty members |
-| `staff.manage` | Manage faculty members |
-| `students.view` | View students |
-| `students.manage` | Manage students and sections |
-| `registration.self` | Self-service course registration |
-| `imports.view` | View import history |
-| `imports.manage` | Import student/roster data |
-| `attendance.view` | View attendance records |
-| `attendance.record` | Record attendance |
-| `attendance.manage` | Manage/update attendance records |
-| `assessments.view` | View assessments |
-| `assessments.submit` | Submit assessments |
-| `assessments.review` | Review/approve assessments |
-| `assessments.manage` | Manage assessments |
-| `graduation.view` | View graduation submissions |
-| `graduation.submit` | Submit graduation data |
-| `graduation.review` | Review graduation submissions |
-| `reports.view` | View dashboards and reports |
-| `reports.generate` | Generate reports |
-| `audit.view` | View audit logs |
-| `settings.institution` | Manage institution settings/semesters |
-| `settings.department` | Manage department settings |
-| `settings.manage` | Manage system settings (demo, etc.) |
+| Code                          | Description                           |
+| ----------------------------- | ------------------------------------- |
+| `users.manage`                | Manage user accounts (admin)          |
+| `roles.manage`                | Manage roles and permissions          |
+| `departments.view`            | View departments                      |
+| `departments.manage`          | Create/update/delete departments      |
+| `programmes.view`             | View programmes                       |
+| `programmes.manage`           | Create/update/delete programmes       |
+| `courses.view`                | View courses                          |
+| `courses.manage`              | Create/update/delete courses          |
+| `venues.view`                 | View venues                           |
+| `venues.manage`               | Create/update/delete venues           |
+| `timetable.view`              | View master timetables                |
+| `timetable.upload`            | Upload master timetables              |
+| `timetable.department_upload` | Upload department timetables          |
+| `timetable.edit`              | Edit master timetable entries         |
+| `schedule.view`               | View schedule items and slot requests |
+| `schedule.request`            | Submit slot requests                  |
+| `schedule.withdraw`           | Withdraw slot requests                |
+| `schedule.approve`            | Approve/return slot requests          |
+| `schedule.manage`             | Manage schedule items                 |
+| `conflicts.view`              | View conflict centre                  |
+| `conflicts.override`          | Override conflicts                    |
+| `staff.view`                  | View faculty members                  |
+| `staff.manage`                | Manage faculty members                |
+| `students.view`               | View students                         |
+| `students.manage`             | Manage students and sections          |
+| `registration.self`           | Self-service course registration      |
+| `imports.view`                | View import history                   |
+| `imports.manage`              | Import student/roster data            |
+| `attendance.view`             | View attendance records               |
+| `attendance.record`           | Record attendance                     |
+| `attendance.manage`           | Manage/update attendance records      |
+| `assessments.view`            | View assessments                      |
+| `assessments.submit`          | Submit assessments                    |
+| `assessments.review`          | Review/approve assessments            |
+| `assessments.manage`          | Manage assessments                    |
+| `graduation.view`             | View graduation submissions           |
+| `graduation.submit`           | Submit graduation data                |
+| `graduation.review`           | Review graduation submissions         |
+| `reports.view`                | View dashboards and reports           |
+| `reports.generate`            | Generate reports                      |
+| `audit.view`                  | View audit logs                       |
+| `settings.institution`        | Manage institution settings/semesters |
+| `settings.department`         | Manage department settings            |
+| `settings.manage`             | Manage system settings (demo, etc.)   |
