@@ -12,6 +12,7 @@ from app.schemas.registration import (
     CatalogueListResponse,
     CatalogueCourseResponse,
     RegistrationCreate,
+    RegistrationDetailResponse,
     RegistrationListResponse,
     RegistrationResponse,
 )
@@ -46,6 +47,32 @@ async def list_my_registrations(
             totalCredits=extra["totalCredits"],
         ),
     )
+
+
+@router.get("/me/registrations/{registration_id}", response_model=RegistrationDetailResponse)
+async def get_registration_detail(
+    registration_id: UUID,
+    current_user: User = Depends(require_permission("registration.self")),
+    db: AsyncSession = Depends(get_db),
+):
+    service = RegistrationService(db)
+
+    category = None
+    if current_user.student_category:
+        category = current_user.student_category.value
+
+    detail = await service.get_registration_detail(
+        registration_id=registration_id,
+        student_id=current_user.id,
+        student_category=category,
+    )
+    if not detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Registration not found",
+        )
+
+    return RegistrationDetailResponse(**detail)
 
 
 @router.get("/registration/catalogue", response_model=CatalogueListResponse)
