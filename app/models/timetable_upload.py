@@ -20,6 +20,7 @@ class TimetableUpload(Base):
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
     entry_count = Column(Integer, default=0)
     kind = Column(String(20), nullable=False)  # "master" or "department"
+    category = Column(String(20), server_default="undergraduate", nullable=False)
     department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

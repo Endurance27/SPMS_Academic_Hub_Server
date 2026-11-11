@@ -101,19 +101,48 @@ def _sheet_has_timetable_content(ws) -> bool:
     return False
 
 
+_PG_DAY_NAMES_LOOKUP = {
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+    "friday": 4, "saturday": 5, "sunday": 6,
+}
+
+
+def _parse_pg_time_range(raw: str) -> Optional[tuple]:
+    """Parse '17:30 - 19:30' into ('17:30', '19:30')."""
+    if not raw:
+        return None
+    m = re.match(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", raw.strip())
+    if not m:
+        return None
+    return (m.group(1), m.group(2))
+
+
+def _extract_course_code_from_cell(cell_text: str) -> Optional[str]:
+    """Extract course code from PG cell like 'CSCD 601: Research Methods\\nVenue: ...'."""
+    m = re.match(r"([A-Z]{2,6}\s*\d{3})", cell_text.strip())
+    return m.group(1) if m else None
+
+
+def _extract_venue_from_cell(cell_text: str) -> str:
+    """Extract venue from PG cell content that contains 'Venue: ...'."""
+    m = re.search(r"Venue:\s*(.+?)(?:\n|\[|$)", cell_text)
+    if m:
+        return m.group(1).strip()
+    return ""
+
+
 class TimetableParser:
     """Parser for University of Ghana master timetable Excel files.
 
-    Handles the pivot-table format where:
-    - Each sheet is one level (L100v1, L200v1, ...)
-    - Days are paired columns (Subject/Venue) across the row
-    - Time slots span multiple data rows vertically
-    - The layout repeats with section headers every ~25 rows
+    Handles two formats:
+    - UG pivot-table: each sheet is one level (L100v1, L200v1, ...)
+    - PG tabular: 'General' sheet with programme/course rows and day/time columns
     """
 
     def __init__(self):
         self.issues: List[TimetableParseIssue] = []
         self.entries: List[Dict[str, Any]] = []
+        self.category: str = "undergraduate"
 
     def parse_file(
         self,
@@ -127,11 +156,12 @@ class TimetableParser:
         Args:
             file_content: Raw bytes of the uploaded file.
             file_type: "xlsx" or "csv".
-            level: Target level (100/200/300/400). 0 means all levels.
+            level: Target level (100/200/300/400/600+). 0 means all levels.
             semester_id: Semester UUID string (unused by parser, kept for API compat).
         """
         self.issues = []
         self.entries = []
+        self.category = "undergraduate"
 
         try:
             if file_type == "xlsx":
@@ -165,14 +195,34 @@ class TimetableParser:
                 "levels": levels_found,
                 "level": level if level else None,
             },
+            "category": self.category,
         }
 
     # ------------------------------------------------------------------
     # Excel pivot-table parser (primary format)
     # ------------------------------------------------------------------
 
+    def _detect_pg_format(self, wb) -> bool:
+        """Detect if the workbook is a PG timetable based on sheet structure."""
+        level_sheets = [s for s in wb.sheetnames if _extract_level_from_sheet(s)]
+        if level_sheets:
+            return False
+        if "General" not in wb.sheetnames:
+            return False
+        ws = wb["General"]
+        for row in ws.iter_rows(min_row=1, max_row=5, values_only=True):
+            text = " ".join(str(c).lower() for c in row if c is not None)
+            if "course code" in text or "program" in text:
+                return True
+        return False
+
     def _parse_excel(self, content: bytes, level: int):
         wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+
+        if self._detect_pg_format(wb):
+            self.category = "postgraduate"
+            self._parse_pg_excel(wb, level)
+            return
 
         sheets_parsed = 0
         for sheet_name in wb.sheetnames:
@@ -281,6 +331,149 @@ class TimetableParser:
                     "is_free": is_free,
                     "course_kind": _extract_course_kind(subject) if not is_free else None,
                 })
+
+    # ------------------------------------------------------------------
+    # PG tabular parser (General sheet with course rows + day/time columns)
+    # ------------------------------------------------------------------
+
+    def _parse_pg_excel(self, wb, level: int):
+        """Parse the PG timetable from the General sheet."""
+        ws = wb["General"]
+        rows = list(ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=True))
+        if len(rows) < 4:
+            self.issues.append(TimetableParseIssue(0, "error", "General sheet has too few rows"))
+            return
+
+        # Build the schedule column map from rows 2-3 (day headers + time headers)
+        schedule_cols = self._pg_build_column_map(rows)
+        if not schedule_cols:
+            self.issues.append(TimetableParseIssue(0, "error", "Could not detect day/time columns in General sheet"))
+            return
+
+        # Find header row to locate metadata columns
+        header_row_idx = None
+        col_map = {}
+        for i, row in enumerate(rows[:5]):
+            text = [str(c).lower().strip() if c else "" for c in row]
+            if "course code" in text:
+                header_row_idx = i
+                for j, val in enumerate(text):
+                    if val:
+                        col_map[val] = j
+                break
+
+        if header_row_idx is None:
+            self.issues.append(TimetableParseIssue(0, "error", "Could not find header row with 'Course Code'"))
+            return
+
+        course_code_col = col_map.get("course code")
+        venue_col = col_map.get("venue")
+        course_type_col = col_map.get("coursetype")
+        programme_col = col_map.get("program")
+
+        for row_num, row in enumerate(rows[header_row_idx + 1:], start=header_row_idx + 3):
+            course_code_raw = str(row[course_code_col]).strip() if course_code_col is not None and course_code_col < len(row) and row[course_code_col] else ""
+            if not course_code_raw or not re.match(r"[A-Z]{2,6}\s*\d{3}", course_code_raw):
+                continue
+
+            subject = _normalize_subject(course_code_raw)
+            default_venue = ""
+            if venue_col is not None and venue_col < len(row) and row[venue_col]:
+                default_venue = _normalize_venue(str(row[venue_col]).strip())
+
+            course_kind = None
+            if course_type_col is not None and course_type_col < len(row) and row[course_type_col]:
+                ct = str(row[course_type_col]).strip().lower()
+                if ct == "core":
+                    course_kind = "C"
+                elif ct == "elective":
+                    course_kind = "E"
+
+            entry_level = _infer_level_from_subject(subject) or 0
+            if level and entry_level != level:
+                continue
+
+            programme_name = ""
+            if programme_col is not None and programme_col < len(row) and row[programme_col]:
+                programme_name = str(row[programme_col]).strip()
+
+            for col_idx, day_idx, period_idx, start_t, end_t in schedule_cols:
+                if col_idx >= len(row) or not row[col_idx]:
+                    continue
+                cell_text = str(row[col_idx]).strip()
+                if not cell_text:
+                    continue
+
+                cell_venue = _extract_venue_from_cell(cell_text)
+                venue = _normalize_venue(cell_venue) if cell_venue else default_venue
+
+                if not venue:
+                    self.issues.append(
+                        TimetableParseIssue(
+                            row_num, "warning",
+                            f"Course '{subject}' has no venue for "
+                            f"{list(_PG_DAY_NAMES_LOOKUP.keys())[day_idx].title()} {start_t}-{end_t}"
+                        )
+                    )
+
+                self.entries.append({
+                    "level": entry_level,
+                    "day": day_idx,
+                    "period": period_idx,
+                    "subject": subject,
+                    "venue_code": venue,
+                    "is_free": False,
+                    "course_kind": course_kind,
+                    "start_time": start_t,
+                    "end_time": end_t,
+                    "programme": programme_name,
+                })
+
+    def _pg_build_column_map(self, rows) -> List[tuple]:
+        """Build schedule column map from the day/time header rows.
+
+        Returns list of (col_index, day_index, period_index, start_time, end_time).
+        """
+        day_row = None
+        time_row = None
+        for i, row in enumerate(rows[:5]):
+            text = " ".join(str(c).lower() for c in row if c is not None)
+            if "monday" in text or "tuesday" in text:
+                day_row = row
+                if i + 1 < len(rows):
+                    time_row = rows[i + 1]
+                break
+
+        if day_row is None or time_row is None:
+            return []
+
+        # Map column index → day name from the day header row
+        col_to_day: Dict[int, int] = {}
+        current_day = None
+        for col_idx, cell in enumerate(day_row):
+            if cell is not None:
+                day_name = str(cell).strip().lower()
+                if day_name in _PG_DAY_NAMES_LOOKUP:
+                    current_day = _PG_DAY_NAMES_LOOKUP[day_name]
+            if current_day is not None:
+                col_to_day[col_idx] = current_day
+
+        # Map column index → time slot from the time header row
+        result = []
+        day_period_counters: Dict[int, int] = {}
+
+        for col_idx, cell in enumerate(time_row):
+            if cell is None or col_idx not in col_to_day:
+                continue
+            parsed = _parse_pg_time_range(str(cell))
+            if not parsed:
+                continue
+            day_idx = col_to_day[col_idx]
+            period_idx = day_period_counters.get(day_idx, 0)
+            day_period_counters[day_idx] = period_idx + 1
+            result.append((col_idx, day_idx, period_idx, parsed[0], parsed[1]))
+
+        return result
 
     # ------------------------------------------------------------------
     # CSV fallback (flat format: Level, Day, Time, Subject, Venue)

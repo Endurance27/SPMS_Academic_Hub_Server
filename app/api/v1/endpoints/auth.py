@@ -214,7 +214,7 @@ async def register(
         department_id=programme.departments[0].id,
         level=data.level,
         student_number=data.student_number,
-        student_category="Undergraduate" if data.level <= 400 else "Postgraduate",
+        student_category=programme.category.value,
         title=f"Level {data.level} Student",
     )
     db.add(user)
