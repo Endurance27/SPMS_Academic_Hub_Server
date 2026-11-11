@@ -18,6 +18,7 @@ from app.models.registration import (
     ImportKind,
     ImportRowOutcome,
     ImportStatus,
+    RegistrationSource,
     RegistrationStatus,
     RegistrationType,
     StudentImport,
@@ -301,7 +302,7 @@ class ImportService:
                         registration_type=RegistrationType.CORE,
                         credits=3,
                         status=RegistrationStatus.REGISTERED,
-                        source="roster-import",
+                        source=RegistrationSource.ROSTER_IMPORT,
                     )
                     self.db.add(reg)
 
