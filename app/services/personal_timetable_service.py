@@ -175,6 +175,9 @@ class PersonalTimetableService:
                 "is_free": entry.is_free,
                 "course_kind": entry.course_kind,
                 "source": "department" if entry.department_id else "master",
+                "programme": entry.programme,
+                "lecturer_name": entry.lecturer_name,
+                "course_title": entry.course_title,
             })
 
         stats = {
@@ -206,7 +209,7 @@ class PersonalTimetableService:
         )
 
         output = io.StringIO()
-        headers = ["Day", "Time", "Course", "Venue", "Level", "Type"]
+        headers = ["Day", "Time", "Course", "Venue", "Level", "Type", "Programme"]
         writer = csv.DictWriter(output, fieldnames=headers)
         writer.writeheader()
         for entry in data["entries"]:
@@ -219,6 +222,7 @@ class PersonalTimetableService:
                 "Venue": entry.get("venue_code", ""),
                 "Level": entry.get("level", ""),
                 "Type": entry.get("course_kind", ""),
+                "Programme": entry.get("programme", ""),
             })
 
         return output.getvalue()
@@ -256,6 +260,9 @@ class PersonalTimetableService:
             "is_free": entry.is_free,
             "course_kind": entry.course_kind,
             "source": "department" if entry.department_id else "master",
+            "programme": entry.programme,
+            "lecturer_name": entry.lecturer_name,
+            "course_title": entry.course_title,
         }
 
         norm_code = _normalize_course_code(entry.subject)

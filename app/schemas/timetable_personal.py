@@ -18,6 +18,9 @@ class MasterEntryItem(BaseModel):
     is_free: bool = False
     course_kind: Optional[str] = None
     source: str = "master"
+    programme: Optional[str] = None
+    lecturer_name: Optional[str] = None
+    course_title: Optional[str] = None
 
 
 class VenueDetail(BaseModel):
@@ -44,6 +47,9 @@ class MasterEntryDetailResponse(BaseModel):
     is_free: bool = False
     course_kind: Optional[str] = None
     source: str = "master"
+    programme: Optional[str] = None
+    lecturer_name: Optional[str] = None
+    course_title: Optional[str] = None
 
     course_id: Optional[uuid.UUID] = None
     course_title: Optional[str] = None

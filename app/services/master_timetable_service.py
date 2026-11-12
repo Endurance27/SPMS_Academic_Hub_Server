@@ -221,6 +221,9 @@ class MasterTimetableService:
                 "department_id": str(entry.department_id) if entry.department_id else None,
                 "course_kind": entry.course_kind,
                 "source": "department" if entry.department_id else "master",
+                "programme": entry.programme,
+                "lecturer_name": entry.lecturer_name,
+                "course_title": entry.course_title,
                 "double_booked": clashing is not None,
                 "clashing_subjects": sorted(clashing) if clashing else [],
             })
@@ -277,6 +280,9 @@ class MasterTimetableService:
         source: Optional[str] = None,
         department_id: Optional[uuid.UUID] = None,
         category: Optional[str] = None,
+        programme: Optional[str] = None,
+        cohort: Optional[str] = None,
+        course_kind: Optional[str] = None,
     ) -> tuple[List[Dict], Dict]:
         """Get timetable entries with filtering.
 
@@ -293,6 +299,9 @@ class MasterTimetableService:
                 level=level,
                 day=day,
                 category=category,
+                programme=programme,
+                cohort=cohort,
+                course_kind=course_kind,
             )
             entries = _merge_entries(all_entries)
 
@@ -310,6 +319,9 @@ class MasterTimetableService:
                 source=source,
                 department_id=department_id,
                 category=category,
+                programme=programme,
+                cohort=cohort,
+                course_kind=course_kind,
             )
 
         meta = {}
@@ -332,6 +344,10 @@ class MasterTimetableService:
 
         meta["total_count"] = len(entries)
         meta["free_count"] = sum(1 for e in entries if e.is_free)
+
+        distinct_programmes = sorted({e.programme for e in entries if e.programme})
+        if distinct_programmes:
+            meta["programmes"] = distinct_programmes
 
         result = []
         for entry in entries:
@@ -357,6 +373,9 @@ class MasterTimetableService:
                 "department_id": str(entry.department_id) if entry.department_id else None,
                 "course_kind": entry.course_kind,
                 "source": "department" if entry.department_id else "master",
+                "programme": entry.programme,
+                "lecturer_name": entry.lecturer_name,
+                "course_title": entry.course_title,
             })
 
         return result, meta
@@ -478,6 +497,9 @@ class MasterTimetableService:
                     course_kind=entry.get("course_kind"),
                     start_time=entry.get("start_time"),
                     end_time=entry.get("end_time"),
+                    programme=entry.get("programme") or None,
+                    lecturer_name=entry.get("lecturer_name") or None,
+                    course_title=entry.get("course_title") or None,
                 )
                 for entry in level_entries
             ])
@@ -629,6 +651,9 @@ class MasterTimetableService:
                     course_kind=entry.get("course_kind"),
                     start_time=entry.get("start_time"),
                     end_time=entry.get("end_time"),
+                    programme=entry.get("programme") or None,
+                    lecturer_name=entry.get("lecturer_name") or None,
+                    course_title=entry.get("course_title") or None,
                 )
                 for entry in level_entries
             ])
@@ -654,14 +679,17 @@ class MasterTimetableService:
         semester_id: uuid.UUID,
         level: Optional[int] = None,
         category: Optional[str] = None,
+        programme: Optional[str] = None,
+        cohort: Optional[str] = None,
     ) -> str:
         """Export timetable as CSV"""
-        entries, _ = await self.get_entries(semester_id, level, category=category)
+        entries, _ = await self.get_entries(semester_id, level, category=category, programme=programme, cohort=cohort)
 
-        lines = ["Level,Day,Time,Subject,Venue"]
+        lines = ["Level,Day,Time,Subject,Venue,Programme"]
         for entry in entries:
             time = f"{entry['period_start']}-{entry['period_end']}"
-            lines.append(f"{entry['level']},{entry['day']},{time},{entry['subject']},{entry['venue_code']}")
+            prog = entry.get('programme') or ''
+            lines.append(f"{entry['level']},{entry['day']},{time},{entry['subject']},{entry['venue_code']},{prog}")
 
         return "\n".join(lines)
 

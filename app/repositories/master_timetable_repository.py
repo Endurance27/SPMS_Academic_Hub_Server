@@ -57,6 +57,13 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         )
         return result.scalar_one()
 
+    # Cohort → day filter: which days each cohort attends
+    COHORT_DAYS = {
+        "evening": [0, 1, 2, 3, 4],      # Mon-Fri
+        "weekend_saturday": [4, 5],        # Fri + Sat
+        "weekend_sunday": [4, 6],          # Fri + Sun
+    }
+
     async def get_entries(
         self,
         semester_id: uuid.UUID,
@@ -67,6 +74,9 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         source: Optional[str] = None,
         department_id: Optional[uuid.UUID] = None,
         category: Optional[str] = None,
+        programme: Optional[str] = None,
+        cohort: Optional[str] = None,
+        course_kind: Optional[str] = None,
     ) -> List[MasterEntry]:
         query = (
             select(MasterEntry)
@@ -92,6 +102,14 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
             query = query.where(MasterEntry.subject.in_(subjects))
         if day is not None:
             query = query.where(MasterEntry.day == day)
+        if programme is not None:
+            query = query.where(MasterEntry.programme == programme)
+        if cohort is not None:
+            cohort_days = self.COHORT_DAYS.get(cohort)
+            if cohort_days:
+                query = query.where(MasterEntry.day.in_(cohort_days))
+        if course_kind is not None:
+            query = query.where(MasterEntry.course_kind == course_kind)
 
         query = query.order_by(MasterEntry.day, MasterEntry.period, MasterEntry.venue_code)
 
