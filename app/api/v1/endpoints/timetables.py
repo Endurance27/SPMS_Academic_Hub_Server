@@ -422,7 +422,6 @@ async def publish_department_timetable(
 @router.get("/entries/{entry_id}", response_model=dict)
 async def get_entry_detail(
     entry_id: uuid.UUID,
-    current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single timetable entry by ID with enriched details (course, lecturer, department, venue)."""
