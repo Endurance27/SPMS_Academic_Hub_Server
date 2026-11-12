@@ -16,8 +16,10 @@ from app.schemas.master_timetable import (
     TimetableListResponse,
     TimetableEntriesResponse,
 )
+from app.schemas.timetable_personal import MasterEntryDetailResponse
 from app.schemas.pagination import PaginationMeta
 from app.services.master_timetable_service import MasterTimetableService, sync_venues_from_codes
+from app.services.personal_timetable_service import PersonalTimetableService
 
 router = APIRouter()
 
@@ -52,6 +54,9 @@ async def get_timetable_entries(
     subjects: Optional[str] = Query(None),
     day: Optional[int] = Query(None),
     category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
+    programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
+    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: 'evening' (Mon-Fri), 'weekend_saturday' (Fri+Sat), 'weekend_sunday' (Fri+Sun)"),
+    course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -66,6 +71,9 @@ async def get_timetable_entries(
         subjects=subjects_list,
         day=day,
         category=category,
+        programme=programme,
+        cohort=cohort,
+        course_kind=course_kind,
     )
     return TimetableEntriesResponse(data=entries, meta=meta)
 
@@ -78,6 +86,9 @@ async def get_master_only_entries(
     subjects: Optional[str] = Query(None),
     day: Optional[int] = Query(None),
     category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
+    programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
+    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: 'evening' (Mon-Fri), 'weekend_saturday' (Fri+Sat), 'weekend_sunday' (Fri+Sun)"),
+    course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -93,6 +104,9 @@ async def get_master_only_entries(
         day=day,
         source="master",
         category=category,
+        programme=programme,
+        cohort=cohort,
+        course_kind=course_kind,
     )
     return TimetableEntriesResponse(data=entries, meta=meta)
 
@@ -106,6 +120,9 @@ async def get_department_entries(
     subjects: Optional[str] = Query(None),
     day: Optional[int] = Query(None),
     category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
+    programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
+    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: 'evening' (Mon-Fri), 'weekend_saturday' (Fri+Sat), 'weekend_sunday' (Fri+Sun)"),
+    course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -122,6 +139,9 @@ async def get_department_entries(
         source="department",
         department_id=department_id,
         category=category,
+        programme=programme,
+        cohort=cohort,
+        course_kind=course_kind,
     )
     return TimetableEntriesResponse(data=entries, meta=meta)
 
@@ -152,6 +172,8 @@ async def export_timetable(
     semester_id: uuid.UUID = Query(...),
     level: Optional[int] = Query(None),
     category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
+    programme: Optional[str] = Query(None, description="Filter PG entries by programme"),
+    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: 'evening', 'weekend_saturday', 'weekend_sunday'"),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -159,11 +181,13 @@ async def export_timetable(
     from fastapi.responses import Response
 
     service = MasterTimetableService(db)
-    csv_content = await service.export_timetable(semester_id, level, category=category)
+    csv_content = await service.export_timetable(semester_id, level, category=category, programme=programme, cohort=cohort)
 
     filename = f"semester-{semester_id}"
     if level:
         filename += f"-L{level}"
+    if programme:
+        filename += f"-{programme}"
     filename += "-master-timetable.csv"
 
     return Response(
@@ -394,6 +418,20 @@ async def publish_department_timetable(
 
 
 # ── Entry-level CRUD (sub-path with {entry_id}) ────────────────────
+
+@router.get("/entries/{entry_id}", response_model=dict)
+async def get_entry_detail(
+    entry_id: uuid.UUID,
+    current_user: User = Depends(require_permission("timetable.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a single timetable entry by ID with enriched details (course, lecturer, department, venue)."""
+    service = PersonalTimetableService(db)
+    data = await service.get_entry_detail(entry_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return {"data": MasterEntryDetailResponse(**data).model_dump()}
+
 
 @router.patch("/entries/{entry_id}")
 async def update_entry(
