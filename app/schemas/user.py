@@ -70,15 +70,6 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class Pagination(BaseModel):
-    page: int
-    per_page: int
-    total: int
-    total_pages: int
-    has_next: bool
-    has_prev: bool
-
-
 class UsersListResponse(BaseModel):
-    items: List[UserResponse]
-    pagination: Pagination
+    data: List[UserResponse]
+    meta: Optional[dict] = None

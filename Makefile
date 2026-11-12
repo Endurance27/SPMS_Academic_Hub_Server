@@ -4,7 +4,9 @@
 GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
 RESET  := $(shell tput -Txterm sgr0)
-	
+
+GIT_USERNAME = legend-crypt
+BUILD_IMAGE = spms-academic-hub
 
 help:
 	@echo "Available commands:"
@@ -34,8 +36,14 @@ dev-install:
 up:
 	docker compose up -d
 	@echo "${GREEN}All services started!${RESET}"
-	@echo "API: http://localhost:8000"
-	@echo "Docs: http://localhost:8000/api/v1/docs"
+	@echo "API: http://localhost:8001"
+	@echo "Docs: http://localhost:8001/api/v1/docs"
+
+up-remote: ## Start services with remote database (no local Postgres)
+	docker compose -f docker-compose.remote.yml up -d
+	@echo "${GREEN}Services started with remote database!${RESET}"
+	@echo "API: http://localhost:8001"
+	@echo "Docs: http://localhost:8001/api/v1/docs"
 
 down:
 	docker compose down
@@ -233,6 +241,45 @@ prod-build: ## Build production images
 
 prod-deploy: prod-build prod-down prod-up migrate seed-permissions ## Full production deployment
 	@echo "${GREEN}Production deployment complete!${RESET}"
+
+# ============================================================================
+# Docker Image Build & Push (CI/CD)
+# ============================================================================
+BUILD_IMAGE ?= spms-academic-hub
+BUILD_TAG ?= latest
+GIT_USERNAME ?= username
+
+build-image: ## Build Docker image
+	docker build -f docker/Dockerfile -t "$(BUILD_IMAGE):$(BUILD_TAG)" .
+	@echo "${GREEN}Docker image built: $(BUILD_IMAGE):$(BUILD_TAG)${RESET}"
+
+build-image-push: ## Build and push Docker image to GHCR
+	@echo "${YELLOW}Logging into GitHub Container Registry...${RESET}"
+	@echo "$(GIT_PERSONAL_ACCESS_TOKEN)" | docker login ghcr.io -u "$(GIT_USERNAME)" --password-stdin
+	@echo "${YELLOW}Tagging image for GHCR...${RESET}"
+	docker tag "$(BUILD_IMAGE):$(BUILD_TAG)" "ghcr.io/$(GIT_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
+	@echo "${YELLOW}Pushing image to GHCR...${RESET}"
+	docker push "ghcr.io/$(GIT_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
+	@echo "${GREEN}Image pushed to GHCR: ghcr.io/$(GIT_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)${RESET}"
+
+build-image-pull: ## Pull Docker image from GHCR
+	@echo "${YELLOW}Logging into GitHub Container Registry...${RESET}"
+	@echo "$(GIT_PERSONAL_ACCESS_TOKEN)" | docker login ghcr.io -u "$(GIT_USERNAME)" --password-stdin
+	@echo "${YELLOW}Pulling image from GHCR...${RESET}"
+	docker pull "ghcr.io/$(GIT_USERNAME)/$(BUILD_IMAGE):$(BUILD_TAG)"
+	@echo "${GREEN}Image pulled from GHCR${RESET}"
+
+prod-migrate: ## Run migrations in production
+	docker compose -f docker-compose.prod.yml exec -T api python scripts/migrate_db.py
+	@echo "${GREEN}Production migrations applied!${RESET}"
+
+prod-seed-permissions: ## Seed permissions in production
+	docker compose -f docker-compose.prod.yml exec -T api python scripts/seed_permissions.py
+	@echo "${GREEN}Production permissions seeded!${RESET}"
+
+prod-nuke: ## Clean production (removes volumes, images, containers)
+	docker compose -f docker-compose.prod.yml down --rmi all --volumes --remove-orphans
+	@echo "${YELLOW}Production Docker resources cleaned${RESET}"
 
 # ============================================================================
 # Monitoring

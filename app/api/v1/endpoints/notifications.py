@@ -1,26 +1,35 @@
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
-from app.schemas.notification import NotificationMarkRead, NotificationResponse
+from app.schemas.notification import NotificationListResponse, NotificationMarkRead, NotificationResponse
+from app.schemas.pagination import PaginationMeta
 from app.services.notification_service import NotificationService
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 
-@router.get("", response_model=List[NotificationResponse])
+@router.get("", response_model=NotificationListResponse)
 async def get_notifications(
     unread_only: bool = False,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get user notifications"""
     notification_service = NotificationService(db)
-    notifications = await notification_service.get_user_notifications(current_user.id, unread_only)
-    return notifications
+    skip = (page - 1) * page_size
+    notifications, total = await notification_service.get_user_notifications(
+        current_user.id, unread_only, skip, page_size
+    )
+    return NotificationListResponse(
+        data=notifications,
+        meta=PaginationMeta.build(page, page_size, total),
+    )
 
 
 @router.get("/unread-count")
@@ -41,7 +50,7 @@ async def mark_notifications_read(
 ):
     """Mark notifications as read"""
     notification_service = NotificationService(db)
-    await notification_service.mark_as_read(data.notification_ids)
+    await notification_service.mark_as_read(data.notification_ids, current_user.id)
 
 
 @router.post("/mark-all-read", status_code=status.HTTP_204_NO_CONTENT)
@@ -58,4 +67,4 @@ async def mark_all_read(
 
     if notifications:
         notification_ids = [n.id for n in notifications]
-        await notification_service.mark_as_read(notification_ids)
+        await notification_service.mark_as_read(notification_ids, current_user.id)

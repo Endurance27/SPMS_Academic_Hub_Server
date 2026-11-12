@@ -1,6 +1,6 @@
 import random
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, select, text
@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import SecurityService
 from app.models.password_reset import PasswordResetToken
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.repositories.user_repository import UserRepository
 from app.services.email_service import EmailService
 
@@ -37,7 +37,7 @@ class PasswordService:
             # Don't reveal if email exists or not
             return True
 
-        if not user.is_active:
+        if user.status != UserStatus.ACTIVE:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive")
 
         # Invalidate any existing unused tokens for this user
@@ -64,17 +64,16 @@ class PasswordService:
             token=token,
             ip_address=ip_address,
             user_agent=user_agent,
-            expires_at=datetime.utcnow() + timedelta(minutes=15),  # 15 minutes expiry
-            is_used=False,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
         )
 
         self.db.add(reset_token)
         await self.db.commit()
 
         # Send email with code
-        self.email_service.send_password_reset_code_email(
+        await self.email_service.send_password_reset_code_email(
             to_email=user.email,
-            user_name=f"{user.first_name} {user.last_name}",
+            user_name=user.name,
             reset_code=code,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -97,7 +96,7 @@ class PasswordService:
                     PasswordResetToken.user_id == user.id,
                     PasswordResetToken.code == code,
                     PasswordResetToken.is_used == False,
-                    PasswordResetToken.expires_at > datetime.utcnow(),
+                    PasswordResetToken.expires_at > datetime.now(timezone.utc),
                 )
             )
         )
@@ -120,7 +119,7 @@ class PasswordService:
                 and_(
                     PasswordResetToken.token == token,
                     PasswordResetToken.is_used == False,
-                    PasswordResetToken.expires_at > datetime.utcnow(),
+                    PasswordResetToken.expires_at > datetime.now(timezone.utc),
                 )
             )
         )
@@ -146,15 +145,15 @@ class PasswordService:
 
         # Mark token as used
         reset_token.is_used = True
-        reset_token.used_at = datetime.utcnow()
+        reset_token.used_at = datetime.now(timezone.utc)
 
         await self.db.commit()
         await self.db.refresh(user)
 
         # Send confirmation email
-        self.email_service.send_password_changed_notification_email(
+        await self.email_service.send_password_changed_notification_email(
             to_email=user.email,
-            user_name=f"{user.first_name} {user.last_name}",
+            user_name=user.name,
             ip_address=ip_address,
             user_agent=user_agent,
             change_type="reset",
@@ -192,9 +191,9 @@ class PasswordService:
         await self.db.refresh(user)
 
         # Send confirmation email
-        self.email_service.send_password_changed_notification_email(
+        await self.email_service.send_password_changed_notification_email(
             to_email=user.email,
-            user_name=f"{user.first_name} {user.last_name}",
+            user_name=user.name,
             ip_address=ip_address,
             user_agent=user_agent,
             change_type="change",
