@@ -48,6 +48,9 @@ class MasterEntry(Base):
     course_kind = Column(String(1))  # "C" or "E" or null
     start_time = Column(String(5), nullable=True)  # "HH:MM" for PG entries
     end_time = Column(String(5), nullable=True)  # "HH:MM" for PG entries
+    programme = Column(String(50), nullable=True)  # PG programme code (e.g. "ML", "ITB", "CS")
+    lecturer_name = Column(String(100), nullable=True)  # PG lecturer from timetable sheet
+    course_title = Column(String(200), nullable=True)  # PG course title from timetable sheet
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
