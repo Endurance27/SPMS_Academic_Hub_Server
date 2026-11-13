@@ -224,6 +224,7 @@ class MasterTimetableService:
                 "programme": entry.programme,
                 "lecturer_name": entry.lecturer_name,
                 "course_title": entry.course_title,
+                "delivery_mode": entry.delivery_mode,
                 "double_booked": clashing is not None,
                 "clashing_subjects": sorted(clashing) if clashing else [],
             })
@@ -283,6 +284,7 @@ class MasterTimetableService:
         programme: Optional[str] = None,
         cohort: Optional[str] = None,
         course_kind: Optional[str] = None,
+        lecturer_name: Optional[str] = None,
     ) -> tuple[List[Dict], Dict]:
         """Get timetable entries with filtering.
 
@@ -302,6 +304,7 @@ class MasterTimetableService:
                 programme=programme,
                 cohort=cohort,
                 course_kind=course_kind,
+                lecturer_name=lecturer_name,
             )
             entries = _merge_entries(all_entries)
 
@@ -322,6 +325,7 @@ class MasterTimetableService:
                 programme=programme,
                 cohort=cohort,
                 course_kind=course_kind,
+                lecturer_name=lecturer_name,
             )
 
         meta = {}
@@ -376,6 +380,7 @@ class MasterTimetableService:
                 "programme": entry.programme,
                 "lecturer_name": entry.lecturer_name,
                 "course_title": entry.course_title,
+                "delivery_mode": entry.delivery_mode,
             })
 
         return result, meta
@@ -500,6 +505,7 @@ class MasterTimetableService:
                     programme=entry.get("programme") or None,
                     lecturer_name=entry.get("lecturer_name") or None,
                     course_title=entry.get("course_title") or None,
+                    delivery_mode=entry.get("delivery_mode") or None,
                 )
                 for entry in level_entries
             ])
@@ -654,6 +660,7 @@ class MasterTimetableService:
                     programme=entry.get("programme") or None,
                     lecturer_name=entry.get("lecturer_name") or None,
                     course_title=entry.get("course_title") or None,
+                    delivery_mode=entry.get("delivery_mode") or None,
                 )
                 for entry in level_entries
             ])
@@ -685,11 +692,13 @@ class MasterTimetableService:
         """Export timetable as CSV"""
         entries, _ = await self.get_entries(semester_id, level, category=category, programme=programme, cohort=cohort)
 
-        lines = ["Level,Day,Time,Subject,Venue,Programme"]
+        lines = ["Level,Day,Time,Subject,Venue,Programme,Lecturer,Delivery Mode"]
         for entry in entries:
             time = f"{entry['period_start']}-{entry['period_end']}"
             prog = entry.get('programme') or ''
-            lines.append(f"{entry['level']},{entry['day']},{time},{entry['subject']},{entry['venue_code']},{prog}")
+            lecturer = entry.get('lecturer_name') or ''
+            mode = entry.get('delivery_mode') or ''
+            lines.append(f"{entry['level']},{entry['day']},{time},{entry['subject']},{entry['venue_code']},{prog},{lecturer},{mode}")
 
         return "\n".join(lines)
 
