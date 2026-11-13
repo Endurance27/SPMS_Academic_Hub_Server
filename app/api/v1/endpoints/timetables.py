@@ -11,6 +11,7 @@ from app.core.permissions import require_permission
 from app.models.user import User
 from app.schemas.master_timetable import (
     DepartmentTimetablePreviewResponse,
+    MasterEntryUpdate,
     TimetablePreviewResponse,
     TimetablePublishRequest,
     TimetableListResponse,
@@ -57,6 +58,7 @@ async def get_timetable_entries(
     programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
     cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: 'evening' (Mon-Fri), 'weekend_saturday' (Fri+Sat), 'weekend_sunday' (Fri+Sun)"),
     course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
+    lecturer_name: Optional[str] = Query(None, description="Filter by lecturer name (partial match)"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get all timetable entries (master + department combined)"""
@@ -73,6 +75,7 @@ async def get_timetable_entries(
         programme=programme,
         cohort=cohort,
         course_kind=course_kind,
+        lecturer_name=lecturer_name,
     )
     return TimetableEntriesResponse(data=entries, meta=meta)
 
@@ -88,6 +91,7 @@ async def get_master_only_entries(
     programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
     cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: 'evening' (Mon-Fri), 'weekend_saturday' (Fri+Sat), 'weekend_sunday' (Fri+Sun)"),
     course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
+    lecturer_name: Optional[str] = Query(None, description="Filter by lecturer name (partial match)"),
     db: AsyncSession = Depends(get_db),
 ):
     """Get master timetable entries only (broad department codes like DCIT, MATH, STAT)"""
@@ -105,6 +109,7 @@ async def get_master_only_entries(
         programme=programme,
         cohort=cohort,
         course_kind=course_kind,
+        lecturer_name=lecturer_name,
     )
     return TimetableEntriesResponse(data=entries, meta=meta)
 
@@ -121,6 +126,7 @@ async def get_department_entries(
     programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
     cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: 'evening' (Mon-Fri), 'weekend_saturday' (Fri+Sat), 'weekend_sunday' (Fri+Sun)"),
     course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
+    lecturer_name: Optional[str] = Query(None, description="Filter by lecturer name (partial match)"),
     db: AsyncSession = Depends(get_db),
 ):
     """Get department timetable entries (specific courses like DCIT111, MATH201)"""
@@ -139,6 +145,7 @@ async def get_department_entries(
         programme=programme,
         cohort=cohort,
         course_kind=course_kind,
+        lecturer_name=lecturer_name,
     )
     return TimetableEntriesResponse(data=entries, meta=meta)
 
@@ -432,9 +439,7 @@ async def get_entry_detail(
 @router.patch("/entries/{entry_id}")
 async def update_entry(
     entry_id: uuid.UUID,
-    subject: Optional[str] = None,
-    venue_code: Optional[str] = None,
-    is_free: Optional[bool] = None,
+    body: MasterEntryUpdate,
     current_user: User = Depends(require_permission("timetable.edit")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -447,18 +452,67 @@ async def update_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
-    if is_free:
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    if updates.get("is_free"):
         entry.subject = "FREE"
         entry.is_free = True
-    elif subject is not None:
-        entry.subject = subject.upper().strip()
+    elif "subject" in updates:
+        entry.subject = updates["subject"].upper().strip()
         entry.is_free = entry.subject == "FREE"
-    if venue_code is not None:
-        entry.venue_code = venue_code.upper().strip()
+
+    if "venue_code" in updates:
+        entry.venue_code = updates["venue_code"].upper().strip()
+    if "day" in updates:
+        entry.day = updates["day"]
+    if "period" in updates:
+        entry.period = updates["period"]
+    if "start_time" in updates:
+        entry.start_time = updates["start_time"]
+    if "end_time" in updates:
+        entry.end_time = updates["end_time"]
+    if "course_kind" in updates:
+        entry.course_kind = updates["course_kind"]
+    if "programme" in updates:
+        entry.programme = updates["programme"]
+    if "lecturer_name" in updates:
+        entry.lecturer_name = updates["lecturer_name"]
+    if "course_title" in updates:
+        entry.course_title = updates["course_title"]
+    if "delivery_mode" in updates:
+        entry.delivery_mode = updates["delivery_mode"]
 
     await db.commit()
     await db.refresh(entry)
-    return {"data": {"id": str(entry.id), "subject": entry.subject, "venue_code": entry.venue_code, "is_free": entry.is_free}}
+
+    DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    if entry.start_time and entry.end_time:
+        period_start = entry.start_time
+        period_end = entry.end_time
+    else:
+        h = 7 + entry.period
+        period_start = f"{h:02d}:30"
+        period_end = f"{h + 1:02d}:20"
+
+    return {"data": {
+        "id": str(entry.id),
+        "level": entry.level,
+        "subject": entry.subject,
+        "day": entry.day,
+        "day_name": DAY_NAMES[entry.day] if 0 <= entry.day < len(DAY_NAMES) else None,
+        "period": entry.period,
+        "period_start": period_start,
+        "period_end": period_end,
+        "venue_code": entry.venue_code,
+        "is_free": entry.is_free,
+        "course_kind": entry.course_kind,
+        "programme": entry.programme,
+        "lecturer_name": entry.lecturer_name,
+        "course_title": entry.course_title,
+        "delivery_mode": entry.delivery_mode,
+    }}
 
 
 @router.post("/entries", status_code=status.HTTP_201_CREATED)

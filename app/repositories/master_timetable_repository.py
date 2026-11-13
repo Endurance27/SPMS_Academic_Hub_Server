@@ -77,6 +77,7 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         programme: Optional[str] = None,
         cohort: Optional[str] = None,
         course_kind: Optional[str] = None,
+        lecturer_name: Optional[str] = None,
     ) -> List[MasterEntry]:
         query = (
             select(MasterEntry)
@@ -110,6 +111,8 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
                 query = query.where(MasterEntry.day.in_(cohort_days))
         if course_kind is not None:
             query = query.where(MasterEntry.course_kind == course_kind)
+        if lecturer_name is not None:
+            query = query.where(MasterEntry.lecturer_name.ilike(f"%{lecturer_name}%"))
 
         query = query.order_by(MasterEntry.day, MasterEntry.period, MasterEntry.venue_code)
 
