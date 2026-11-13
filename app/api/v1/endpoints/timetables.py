@@ -88,7 +88,6 @@ async def get_master_only_entries(
     programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
     cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: 'evening' (Mon-Fri), 'weekend_saturday' (Fri+Sat), 'weekend_sunday' (Fri+Sun)"),
     course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
-    current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
 ):
     """Get master timetable entries only (broad department codes like DCIT, MATH, STAT)"""
@@ -122,7 +121,6 @@ async def get_department_entries(
     programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
     cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: 'evening' (Mon-Fri), 'weekend_saturday' (Fri+Sat), 'weekend_sunday' (Fri+Sun)"),
     course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
-    current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db),
 ):
     """Get department timetable entries (specific courses like DCIT111, MATH201)"""
