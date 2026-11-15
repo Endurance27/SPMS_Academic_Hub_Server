@@ -57,18 +57,11 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         )
         return result.scalar_one()
 
-    # Default PG cohort days; AI & ML has separate weekday/weekend cohorts.
+    # PG cohort days: Friday evening, Saturday weekend, or Sunday weekend.
     COHORT_DAYS = {
-        "evening": [0, 1, 2, 3, 4],     # Mon-Fri
-        "weekend_saturday": [4, 5],     # Fri + Sat
-        "weekend_sunday": [4, 6],       # Fri + Sun
-    }
-    PROGRAMME_COHORT_DAYS = {
-        "ai & ml": {
-            "evening": [4],              # Friday
-            "weekend_saturday": [5],     # Saturday
-            "weekend_sunday": [6],       # Sunday
-        }
+        "evening": [4],                 # Friday
+        "weekend_saturday": [5],        # Saturday
+        "weekend_sunday": [6],          # Sunday
     }
 
     async def get_entries(
@@ -115,10 +108,7 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         if cohort is not None:
             cohort_days = self.COHORT_DAYS.get(cohort)
             if cohort_days:
-                programme_days = self.PROGRAMME_COHORT_DAYS.get(
-                    programme.strip().casefold() if programme else "", {}
-                ).get(cohort)
-                query = query.where(MasterEntry.day.in_(programme_days or cohort_days))
+                query = query.where(MasterEntry.day.in_(cohort_days))
         if course_kind is not None:
             query = query.where(MasterEntry.course_kind == course_kind)
         if lecturer_name is not None:
