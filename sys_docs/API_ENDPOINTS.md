@@ -1426,7 +1426,7 @@ Get master timetable entries.
 | `day`         | int?    | No       | Day index       |
 | `category`    | string? | No       | `undergraduate` or `postgraduate` |
 | `programme`   | string? | No       | Programme name  |
-| `cohort`      | string? | No       | Weekend filters include Friday plus the selected day, except CSMD 601, CSMD 609, and CSMD 610, which return Saturday or Sunday only. `evening` is Friday. |
+| `cohort`      | string? | No       | `evening` includes Monday-Friday. Weekend filters include Friday plus the selected day, except CSMD 601, CSMD 609, and CSMD 610, which return Saturday or Sunday only. |
 | `lecturer_name` | string? | No      | Case-insensitive partial match |
 
 - **Response** (`TimetableEntriesResponse`):
