@@ -57,9 +57,9 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         )
         return result.scalar_one()
 
-    # Default PG cohort days: evening on Friday and weekends include Friday.
+    # Default PG cohort days: evening weekdays and weekends include Friday.
     COHORT_DAYS = {
-        "evening": [4],                 # Friday
+        "evening": [0, 1, 2, 3, 4],     # Monday-Friday
         "weekend_saturday": [4, 5],     # Friday + Saturday
         "weekend_sunday": [4, 6],       # Friday + Sunday
     }
