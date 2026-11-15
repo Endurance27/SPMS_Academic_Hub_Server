@@ -51,6 +51,7 @@ class MasterEntry(Base):
     programme = Column(String(50), nullable=True)  # PG programme code (e.g. "ML", "ITB", "CS")
     lecturer_name = Column(String(100), nullable=True)  # PG lecturer from timetable sheet
     course_title = Column(String(200), nullable=True)  # PG course title from timetable sheet
+    delivery_mode = Column(String(20), nullable=True)  # "in-person", "virtual", "hybrid"
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())

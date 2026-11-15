@@ -178,6 +178,7 @@ class PersonalTimetableService:
                 "programme": entry.programme,
                 "lecturer_name": entry.lecturer_name,
                 "course_title": entry.course_title,
+                "delivery_mode": entry.delivery_mode,
             })
 
         stats = {
@@ -209,7 +210,7 @@ class PersonalTimetableService:
         )
 
         output = io.StringIO()
-        headers = ["Day", "Time", "Course", "Venue", "Level", "Type", "Programme"]
+        headers = ["Day", "Time", "Course", "Venue", "Level", "Type", "Programme", "Lecturer", "Delivery Mode"]
         writer = csv.DictWriter(output, fieldnames=headers)
         writer.writeheader()
         for entry in data["entries"]:
@@ -223,6 +224,8 @@ class PersonalTimetableService:
                 "Level": entry.get("level", ""),
                 "Type": entry.get("course_kind", ""),
                 "Programme": entry.get("programme", ""),
+                "Lecturer": entry.get("lecturer_name", ""),
+                "Delivery Mode": entry.get("delivery_mode", ""),
             })
 
         return output.getvalue()
@@ -263,6 +266,7 @@ class PersonalTimetableService:
             "programme": entry.programme,
             "lecturer_name": entry.lecturer_name,
             "course_title": entry.course_title,
+            "delivery_mode": entry.delivery_mode,
         }
 
         norm_code = _normalize_course_code(entry.subject)
