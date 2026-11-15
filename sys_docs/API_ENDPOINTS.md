@@ -1424,6 +1424,12 @@ Get master timetable entries.
 | `venue`       | string? | No       | Venue code      |
 | `subjects`    | string? | No       | Comma-separated |
 | `day`         | int?    | No       | Day index       |
+| `category`    | string? | No       | `undergraduate` or `postgraduate` |
+| `programme`   | string? | No       | Programme name  |
+| `cohort`      | string? | No       | For AI & ML: `evening` is Friday, `weekend_saturday` is Saturday, and `weekend_sunday` is Sunday. |
+| `lecturer_name` | string? | No      | Case-insensitive partial match |
+
+For other programmes, the existing cohort day mappings apply.
 
 - **Response** (`TimetableEntriesResponse`):
 
