@@ -56,7 +56,7 @@ async def get_timetable_entries(
     day: Optional[int] = Query(None),
     category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
-    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: evening=Friday, weekend_saturday=Saturday only, weekend_sunday=Sunday only."),
+    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: weekend filters include Friday plus the selected day, except CSMD 601 which returns only Saturday or Sunday. Evening is Friday."),
     course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
     lecturer_name: Optional[str] = Query(None, description="Filter by lecturer name (partial match)"),
     db: AsyncSession = Depends(get_db)
@@ -89,7 +89,7 @@ async def get_master_only_entries(
     day: Optional[int] = Query(None),
     category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
-    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: evening=Friday, weekend_saturday=Saturday only, weekend_sunday=Sunday only."),
+    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: weekend filters include Friday plus the selected day, except CSMD 601 which returns only Saturday or Sunday. Evening is Friday."),
     course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
     lecturer_name: Optional[str] = Query(None, description="Filter by lecturer name (partial match)"),
     db: AsyncSession = Depends(get_db),
@@ -124,7 +124,7 @@ async def get_department_entries(
     day: Optional[int] = Query(None),
     category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     programme: Optional[str] = Query(None, description="Filter PG entries by programme (e.g. 'CS', 'ITB', 'DS', 'AI & ML', 'NET')"),
-    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: evening=Friday, weekend_saturday=Saturday only, weekend_sunday=Sunday only."),
+    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: weekend filters include Friday plus the selected day, except CSMD 601 which returns only Saturday or Sunday. Evening is Friday."),
     course_kind: Optional[str] = Query(None, description="Filter by course type: 'C' (Core), 'E' (Elective), 'R' (Required/Seminar), 'S' (Special)"),
     lecturer_name: Optional[str] = Query(None, description="Filter by lecturer name (partial match)"),
     db: AsyncSession = Depends(get_db),
@@ -177,7 +177,7 @@ async def export_timetable(
     level: Optional[int] = Query(None),
     category: Optional[str] = Query(None, description="Filter by 'undergraduate' or 'postgraduate'"),
     programme: Optional[str] = Query(None, description="Filter PG entries by programme"),
-    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: evening=Friday, weekend_saturday=Saturday only, weekend_sunday=Sunday only."),
+    cohort: Optional[str] = Query(None, description="Filter PG entries by cohort: weekend filters include Friday plus the selected day, except CSMD 601 which returns only Saturday or Sunday. Evening is Friday."),
     current_user: User = Depends(require_permission("timetable.view")),
     db: AsyncSession = Depends(get_db)
 ):
