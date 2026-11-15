@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional, List
 
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.master_timetable import MasterTimetable, MasterEntry
@@ -57,11 +57,17 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         )
         return result.scalar_one()
 
-    # PG cohort days: Friday evening, Saturday weekend, or Sunday weekend.
+    # Default PG cohort days: evening on Friday and weekends include Friday.
     COHORT_DAYS = {
         "evening": [4],                 # Friday
-        "weekend_saturday": [5],        # Saturday
-        "weekend_sunday": [6],          # Sunday
+        "weekend_saturday": [4, 5],     # Friday + Saturday
+        "weekend_sunday": [4, 6],       # Friday + Sunday
+    }
+    PER_DAY_COURSE_DAYS = {
+        "CSMD601": {
+            "weekend_saturday": [5],    # Saturday only
+            "weekend_sunday": [6],      # Sunday only
+        }
     }
 
     async def get_entries(
@@ -108,7 +114,27 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         if cohort is not None:
             cohort_days = self.COHORT_DAYS.get(cohort)
             if cohort_days:
-                query = query.where(MasterEntry.day.in_(cohort_days))
+                per_day_days = self.PER_DAY_COURSE_DAYS.get("CSMD601", {}).get(cohort)
+                if per_day_days:
+                    normalized_subject = func.replace(
+                        func.upper(func.trim(func.coalesce(MasterEntry.subject, ""))),
+                        " ",
+                        "",
+                    )
+                    query = query.where(
+                        or_(
+                            and_(
+                                normalized_subject == "CSMD601",
+                                MasterEntry.day.in_(per_day_days),
+                            ),
+                            and_(
+                                normalized_subject != "CSMD601",
+                                MasterEntry.day.in_(cohort_days),
+                            ),
+                        )
+                    )
+                else:
+                    query = query.where(MasterEntry.day.in_(cohort_days))
         if course_kind is not None:
             query = query.where(MasterEntry.course_kind == course_kind)
         if lecturer_name is not None:
