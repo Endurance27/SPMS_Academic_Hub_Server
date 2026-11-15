@@ -1429,6 +1429,8 @@ Get master timetable entries.
 | `cohort`      | string? | No       | `evening` includes Monday-Friday. Weekend filters include Friday plus the selected day, except CSMD 601, CSMD 609, and CSMD 610, which return Saturday or Sunday only. |
 | `lecturer_name` | string? | No      | Case-insensitive partial match |
 
+When a course has multiple lecturers, `lecturer_name` contains all names separated by commas.
+
 - **Response** (`TimetableEntriesResponse`):
 
 | Field  | Type     |
