@@ -64,10 +64,9 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         "weekend_sunday": [4, 6],       # Friday + Sunday
     }
     PER_DAY_COURSE_DAYS = {
-        "CSMD601": {
-            "weekend_saturday": [5],    # Saturday only
-            "weekend_sunday": [6],      # Sunday only
-        }
+        "CSMD601": {"weekend_saturday": [5], "weekend_sunday": [6]},
+        "CSMD609": {"weekend_saturday": [5], "weekend_sunday": [6]},
+        "CSMD610": {"weekend_saturday": [5], "weekend_sunday": [6]},
     }
 
     async def get_entries(
@@ -114,8 +113,20 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         if cohort is not None:
             cohort_days = self.COHORT_DAYS.get(cohort)
             if cohort_days:
-                per_day_days = self.PER_DAY_COURSE_DAYS.get("CSMD601", {}).get(cohort)
-                if per_day_days:
+                per_day_filters = [
+                    and_(
+                        func.replace(
+                            func.upper(func.trim(func.coalesce(MasterEntry.subject, ""))),
+                            " ",
+                            "",
+                        )
+                        == course_code,
+                        MasterEntry.day.in_(course_days[cohort]),
+                    )
+                    for course_code, course_days in self.PER_DAY_COURSE_DAYS.items()
+                    if cohort in course_days
+                ]
+                if per_day_filters:
                     normalized_subject = func.replace(
                         func.upper(func.trim(func.coalesce(MasterEntry.subject, ""))),
                         " ",
@@ -123,12 +134,9 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
                     )
                     query = query.where(
                         or_(
+                            *per_day_filters,
                             and_(
-                                normalized_subject == "CSMD601",
-                                MasterEntry.day.in_(per_day_days),
-                            ),
-                            and_(
-                                normalized_subject != "CSMD601",
+                                ~normalized_subject.in_(self.PER_DAY_COURSE_DAYS),
                                 MasterEntry.day.in_(cohort_days),
                             ),
                         )
