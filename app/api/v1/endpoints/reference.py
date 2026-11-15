@@ -28,12 +28,12 @@ _PG_WEEKDAY_SLOTS = [
     {"index": 1, "start": "19:30", "end": "21:30", "label": "19:30 – 21:30"},
 ]
 _PG_WEEKEND_SLOTS = [
-    {"index": 0, "start": "07:30", "end": "09:30", "label": "07:30 – 09:30"},
-    {"index": 1, "start": "09:30", "end": "11:30", "label": "09:30 – 11:30"},
-    {"index": 2, "start": "11:30", "end": "13:30", "label": "11:30 – 13:30"},
-    {"index": 3, "start": "14:00", "end": "16:00", "label": "14:00 – 16:00"},
-    {"index": 4, "start": "16:00", "end": "18:00", "label": "16:00 – 18:00"},
-    {"index": 5, "start": "18:00", "end": "20:00", "label": "18:00 – 20:00"},
+    {"index": 0, "start": "08:00", "end": "10:00", "label": "08:00 – 10:00"},
+    {"index": 1, "start": "10:00", "end": "12:00", "label": "10:00 – 12:00"},
+    {"index": 2, "start": "12:00", "end": "14:00", "label": "12:00 – 14:00"},
+    {"index": 3, "start": "14:30", "end": "16:30", "label": "14:30 – 16:30"},
+    {"index": 4, "start": "16:30", "end": "18:30", "label": "16:30 – 18:30"},
+    {"index": 5, "start": "18:30", "end": "20:30", "label": "18:30 – 20:30"},
 ]
 PG_PERIODS = {
     "weekday": _PG_WEEKDAY_SLOTS,
