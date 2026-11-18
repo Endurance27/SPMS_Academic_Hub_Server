@@ -26,6 +26,7 @@ class VenueCreate(VenueBase):
 
 
 class VenueUpdate(BaseModel):
+    code: Optional[str] = None
     building: Optional[str] = None
     room_number: Optional[str] = None
     location: Optional[str] = None

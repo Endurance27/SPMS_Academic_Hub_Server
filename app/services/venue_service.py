@@ -60,11 +60,18 @@ class VenueService:
         venue = await self.venue_repo.get_by_id(venue_id)
         if not venue:
             return None
-        
+
         update_data = data.model_dump(exclude_unset=True)
+
+        if "code" in update_data and update_data["code"] is not None:
+            update_data["code"] = self._normalize_code(update_data["code"])
+            existing = await self.venue_repo.get_by_code(update_data["code"])
+            if existing and existing.id != venue_id:
+                raise ValueError("Venue code already exists")
+
         for field, value in update_data.items():
             setattr(venue, field, value)
-        
+
         await self.db.commit()
         await self.db.refresh(venue)
         return venue
