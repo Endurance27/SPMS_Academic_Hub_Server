@@ -16,6 +16,7 @@ class SlotRequestCreate(BaseModel):
 class SlotRequestResponse(BaseModel):
     id: UUID
     course_id: UUID
+    meeting_link: Optional[str] = None
     department_id: UUID
     requested_by_id: UUID
     semester_id: UUID
@@ -29,6 +30,7 @@ class SlotRequestResponse(BaseModel):
     reviewed_by_id: Optional[UUID]
     reviewed_at: Optional[str]
     schedule_item_id: Optional[UUID]
+    schedule_item: Optional[dict] = None
     clashes: List[dict] = []
     competing: List[dict] = []
 

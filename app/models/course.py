@@ -46,6 +46,7 @@ class Course(Base):
     type = Column(Enum(CourseType), nullable=False)
     credit_hours = Column(Integer, nullable=False)
     mode = Column(Enum(CourseMode), default=CourseMode.IN_PERSON)
+    meeting_link = Column(String(2048), nullable=True)
     student_count = Column(Integer, nullable=False)
     lecturer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 

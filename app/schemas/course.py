@@ -19,6 +19,7 @@ class CourseBase(BaseModel):
     type: CourseType
     credit_hours: int = Field(..., ge=1, le=6)
     mode: CourseMode = CourseMode.IN_PERSON
+    meeting_link: Optional[str] = Field(None, max_length=2048)
     student_count: int = Field(..., ge=1)
     lecturer_id: Optional[uuid.UUID] = None
     cohorts: List[CourseCohort] = Field(..., min_items=1)
@@ -33,6 +34,7 @@ class CourseUpdate(BaseModel):
     type: Optional[CourseType] = None
     credit_hours: Optional[int] = Field(None, ge=1, le=6)
     mode: Optional[CourseMode] = None
+    meeting_link: Optional[str] = Field(None, max_length=2048)
     student_count: Optional[int] = Field(None, ge=1)
     lecturer_id: Optional[uuid.UUID] = None
     cohorts: Optional[List[CourseCohort]] = None
@@ -46,6 +48,7 @@ class CourseResponse(BaseModel):
     type: CourseType
     credit_hours: int
     mode: CourseMode
+    meeting_link: Optional[str] = None
     student_count: int
     lecturer_id: Optional[uuid.UUID] = None
     cohorts: List[CourseCohort] = []

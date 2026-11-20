@@ -14,6 +14,7 @@ class ScheduleItemCreate(BaseModel):
     venue_code: str
     lecturer_id: Optional[UUID] = None
     mode: str = "in-person"
+    meeting_link: Optional[str] = Field(None, max_length=2048)
     groups: List[dict] = []
 
 
@@ -26,6 +27,7 @@ class ScheduleItemUpdate(BaseModel):
     venue_code: Optional[str] = None
     lecturer_id: Optional[UUID] = None
     mode: Optional[str] = None
+    meeting_link: Optional[str] = Field(None, max_length=2048)
     groups: Optional[List[dict]] = None
 
 
@@ -42,6 +44,7 @@ class ScheduleItemResponse(BaseModel):
     venue_code: str
     lecturer_id: Optional[UUID]
     mode: str
+    meeting_link: Optional[str] = None
     status: str
     source: str
 

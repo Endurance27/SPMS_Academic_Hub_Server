@@ -37,7 +37,7 @@ class VenueService:
 
     def _normalize_code(self, code: str) -> str:
         """Normalize venue code"""
-        return code.upper().replace(" ", "")
+        return code.strip().upper()
 
     async def get_venue(self, venue_id: uuid.UUID) -> Optional[Venue]:
         return await self.venue_repo.get_by_id(venue_id)

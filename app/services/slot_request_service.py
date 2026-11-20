@@ -239,10 +239,12 @@ class SlotRequestService:
                 }, user)
 
             competing = await self._get_competing_requests(req)
+            course = await self._get_course(req.course_id)
 
             result.append({
                 "id": str(req.id),
                 "course_id": str(req.course_id),
+                "meeting_link": course.meeting_link if course else None,
                 "department_id": str(req.department_id),
                 "requested_by_id": str(req.requested_by_id),
                 "semester_id": str(req.semester_id),
@@ -552,9 +554,11 @@ class SlotRequestService:
 
     async def _request_to_dict(self, request: SlotRequest) -> Dict:
         """Convert request to dict"""
+        course = await self._get_course(request.course_id)
         return {
             "id": str(request.id),
             "course_id": str(request.course_id),
+            "meeting_link": course.meeting_link if course else None,
             "department_id": str(request.department_id),
             "requested_by_id": str(request.requested_by_id),
             "semester_id": str(request.semester_id),
@@ -572,10 +576,12 @@ class SlotRequestService:
 
     async def _schedule_item_to_dict(self, item: ScheduleItem) -> Dict:
         """Convert schedule item to dict"""
+        course = await self._get_course(item.course_id)
         return {
             "id": str(item.id),
             "semester_id": str(item.semester_id),
             "course_id": str(item.course_id),
+            "meeting_link": course.meeting_link if course else None,
             "department_id": str(item.department_id),
             "day": item.day,
             "start_period": item.start_period,

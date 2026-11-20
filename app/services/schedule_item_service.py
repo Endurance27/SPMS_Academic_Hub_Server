@@ -59,6 +59,10 @@ class ScheduleItemService:
 
     async def create_item(self, data: Dict, user: User) -> Dict:
         """Create manual schedule item"""
+        if hasattr(data, "model_dump"):
+            data = data.model_dump(exclude_unset=True)
+        elif hasattr(data, "dict"):
+            data = data.dict(exclude_unset=True)
         # Validate course belongs to department
         course = await self._get_course(data["course_id"])
         if not course:
@@ -66,6 +70,9 @@ class ScheduleItemService:
 
         if user.role == UserRole.DEPARTMENT and course.department_id != user.department_id:
             raise ValueError("Can only create items for own department")
+
+        if "meeting_link" in data:
+            course.meeting_link = data["meeting_link"]
 
         # Run clash checks
         clashes = await self._check_item_clashes(data, user)
@@ -105,6 +112,10 @@ class ScheduleItemService:
 
     async def update_item(self, item_id: uuid.UUID, data: Dict, user: User) -> Dict:
         """Update schedule item"""
+        if hasattr(data, "model_dump"):
+            data = data.model_dump(exclude_unset=True)
+        elif hasattr(data, "dict"):
+            data = data.dict(exclude_unset=True)
         item = await self.repo.get_by_id(item_id)
         if not item:
             raise ValueError("Schedule item not found")
@@ -112,6 +123,12 @@ class ScheduleItemService:
         # Scope check
         if user.role == UserRole.DEPARTMENT and item.department_id != user.department_id:
             raise ValueError("Access denied")
+
+        # A meeting link belongs to the course and is shared by all its slots.
+        if "meeting_link" in data:
+            course = await self._get_course(item.course_id)
+            if course:
+                course.meeting_link = data.pop("meeting_link")
 
         # Update fields
         for field, value in data.items():
@@ -229,6 +246,7 @@ class ScheduleItemService:
             "course_id": str(item.course_id),
             "course_code": course.code if course else "",
             "title": course.title if course else "",
+            "meeting_link": course.meeting_link if course else None,
             "department_id": str(item.department_id),
             "day": item.day,
             "start_period": item.start_period,
