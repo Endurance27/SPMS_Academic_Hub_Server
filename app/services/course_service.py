@@ -44,6 +44,7 @@ class CourseService:
             "type": course.type,
             "credit_hours": course.credit_hours,
             "mode": course.mode,
+            "meeting_link": course.meeting_link,
             "student_count": course.student_count,
             "lecturer_id": course.lecturer_id,
             "cohorts": cohorts,
@@ -80,6 +81,7 @@ class CourseService:
             type=data.type,
             credit_hours=data.credit_hours,
             mode=data.mode,
+            meeting_link=data.meeting_link,
             student_count=data.student_count,
             lecturer_id=data.lecturer_id
         )
@@ -143,11 +145,6 @@ class CourseService:
         course = await self.course_repo.get_by_id(course_id)
         if not course:
             return None
-
-        if data.code and data.code != course.code:
-            existing = await self.course_repo.get_by_code(data.code)
-            if existing:
-                raise ValueError(f"{data.code} already exists")
 
         if data.lecturer_id:
             lecturer = await self.db.get(User, data.lecturer_id)
