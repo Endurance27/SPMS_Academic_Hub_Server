@@ -22,6 +22,7 @@ class MasterEntryItem(BaseModel):
     lecturer_name: Optional[str] = None
     course_title: Optional[str] = None
     delivery_mode: Optional[str] = None
+    meeting_link: Optional[str] = None
 
 
 class VenueDetail(BaseModel):
@@ -52,6 +53,7 @@ class MasterEntryDetailResponse(BaseModel):
     lecturer_name: Optional[str] = None
     course_title: Optional[str] = None
     delivery_mode: Optional[str] = None
+    meeting_link: Optional[str] = None
 
     course_id: Optional[uuid.UUID] = None
     course_title: Optional[str] = None
