@@ -166,7 +166,7 @@ async def export_final_timetable(
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Course", "Title", "Day", "Start", "End", "Venue", "Lecturer", "Mode", "Student group", "Status"])
+    writer.writerow(["Course", "Title", "Day", "Start", "End", "Venue", "Lecturer", "Mode", "Meeting Link", "Student group", "Status"])
     for item in items:
         course_code = item.course.code if item.course else ""
         course_title = item.course.title if item.course else ""
@@ -174,7 +174,7 @@ async def export_final_timetable(
         lecturer_name = item.lecturer.name if item.lecturer else "Lecturer to be assigned"
         status_label = STATUS_LABELS.get(item.status.value if isinstance(item.status, ScheduleItemStatus) else item.status, str(item.status))
         groups = ", ".join(item.groups) if item.groups else ""
-        writer.writerow([course_code, course_title, day_name, item.start or "", item.end or "", item.venue_code or "", lecturer_name, item.mode or "", groups, status_label])
+        writer.writerow([course_code, course_title, day_name, item.start or "", item.end or "", item.venue_code or "", lecturer_name, item.mode or "", item.course.meeting_link if item.course else "", groups, status_label])
 
     dept_code = current_user.department_id or "institution"
     level_str = f"L{level}" if level else "all-levels"

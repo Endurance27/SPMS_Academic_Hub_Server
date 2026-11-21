@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional, List
 
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.master_timetable import MasterTimetable, MasterEntry
@@ -57,18 +57,16 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         )
         return result.scalar_one()
 
-    # Default PG cohort days; AI & ML has separate weekday/weekend cohorts.
+    # Default PG cohort days: evening weekdays and weekends include Friday.
     COHORT_DAYS = {
-        "evening": [0, 1, 2, 3, 4],     # Mon-Fri
-        "weekend_saturday": [4, 5],     # Fri + Sat
-        "weekend_sunday": [4, 6],       # Fri + Sun
+        "evening": [0, 1, 2, 3, 4],     # Monday-Friday
+        "weekend_saturday": [4, 5],     # Friday + Saturday
+        "weekend_sunday": [4, 6],       # Friday + Sunday
     }
-    PROGRAMME_COHORT_DAYS = {
-        "ai & ml": {
-            "evening": [4],              # Friday
-            "weekend_saturday": [5],     # Saturday
-            "weekend_sunday": [6],       # Sunday
-        }
+    PER_DAY_COURSE_DAYS = {
+        "CSMD601": {"weekend_saturday": [5], "weekend_sunday": [6]},
+        "CSMD609": {"weekend_saturday": [5], "weekend_sunday": [6]},
+        "CSMD610": {"weekend_saturday": [5], "weekend_sunday": [6]},
     }
 
     async def get_entries(
@@ -115,10 +113,36 @@ class MasterTimetableRepository(BaseRepository[MasterTimetable]):
         if cohort is not None:
             cohort_days = self.COHORT_DAYS.get(cohort)
             if cohort_days:
-                programme_days = self.PROGRAMME_COHORT_DAYS.get(
-                    programme.strip().casefold() if programme else "", {}
-                ).get(cohort)
-                query = query.where(MasterEntry.day.in_(programme_days or cohort_days))
+                per_day_filters = [
+                    and_(
+                        func.replace(
+                            func.upper(func.trim(func.coalesce(MasterEntry.subject, ""))),
+                            " ",
+                            "",
+                        )
+                        == course_code,
+                        MasterEntry.day.in_(course_days[cohort]),
+                    )
+                    for course_code, course_days in self.PER_DAY_COURSE_DAYS.items()
+                    if cohort in course_days
+                ]
+                if per_day_filters:
+                    normalized_subject = func.replace(
+                        func.upper(func.trim(func.coalesce(MasterEntry.subject, ""))),
+                        " ",
+                        "",
+                    )
+                    query = query.where(
+                        or_(
+                            *per_day_filters,
+                            and_(
+                                ~normalized_subject.in_(self.PER_DAY_COURSE_DAYS),
+                                MasterEntry.day.in_(cohort_days),
+                            ),
+                        )
+                    )
+                else:
+                    query = query.where(MasterEntry.day.in_(cohort_days))
         if course_kind is not None:
             query = query.where(MasterEntry.course_kind == course_kind)
         if lecturer_name is not None:

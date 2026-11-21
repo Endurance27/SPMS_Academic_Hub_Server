@@ -371,8 +371,16 @@ class TimetableParser:
         course_type_col = col_map.get("coursetype")
         programme_col = col_map.get("program")
         course_title_col = col_map.get("course title")
-        # Lecturer column has no header; it's the column after Course Title
-        lecturer_col = (course_title_col + 1) if course_title_col is not None else None
+        meeting_link_col = next(
+            (col_map[name] for name in ("meeting link", "meeting_link", "zoom link", "teams link") if name in col_map),
+            None,
+        )
+        first_schedule_col = min(col_idx for col_idx, *_ in schedule_cols)
+        lecturer_start_col = course_title_col + 1 if course_title_col is not None else first_schedule_col
+        lecturer_columns = [
+            col for col in range(lecturer_start_col, first_schedule_col)
+            if col != meeting_link_col
+        ]
 
         for row_num, row in enumerate(rows[header_row_idx + 1:], start=header_row_idx + 3):
             course_code_raw = str(row[course_code_col]).strip() if course_code_col is not None and course_code_col < len(row) and row[course_code_col] else ""
@@ -404,13 +412,25 @@ class TimetableParser:
             if programme_col is not None and programme_col < len(row) and row[programme_col]:
                 programme_name = str(row[programme_col]).strip()
 
-            lecturer_name = ""
-            if lecturer_col is not None and lecturer_col < len(row) and row[lecturer_col]:
-                lecturer_name = str(row[lecturer_col]).strip()
+            lecturer_values = []
+            seen_lecturers = set()
+            for lecturer_col in lecturer_columns:
+                if lecturer_col >= len(row) or not row[lecturer_col]:
+                    continue
+                lecturer_value = str(row[lecturer_col]).strip()
+                lecturer_key = lecturer_value.casefold()
+                if lecturer_value and lecturer_key not in seen_lecturers:
+                    lecturer_values.append(lecturer_value)
+                    seen_lecturers.add(lecturer_key)
+            lecturer_name = ", ".join(lecturer_values)
 
             title = ""
             if course_title_col is not None and course_title_col < len(row) and row[course_title_col]:
                 title = str(row[course_title_col]).strip()
+
+            meeting_link = ""
+            if meeting_link_col is not None and meeting_link_col < len(row) and row[meeting_link_col]:
+                meeting_link = str(row[meeting_link_col]).strip()
 
             for col_idx, day_idx, period_idx, start_t, end_t in schedule_cols:
                 if col_idx >= len(row) or not row[col_idx]:
@@ -444,6 +464,7 @@ class TimetableParser:
                     "programme": programme_name,
                     "lecturer_name": lecturer_name,
                     "course_title": title,
+                    "meeting_link": meeting_link,
                 })
 
     def _pg_build_column_map(self, rows) -> List[tuple]:

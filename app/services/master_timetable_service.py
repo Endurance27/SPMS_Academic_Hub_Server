@@ -225,6 +225,7 @@ class MasterTimetableService:
                 "lecturer_name": entry.lecturer_name,
                 "course_title": entry.course_title,
                 "delivery_mode": entry.delivery_mode,
+                "meeting_link": entry.meeting_link,
                 "double_booked": clashing is not None,
                 "clashing_subjects": sorted(clashing) if clashing else [],
             })
@@ -381,6 +382,7 @@ class MasterTimetableService:
                 "lecturer_name": entry.lecturer_name,
                 "course_title": entry.course_title,
                 "delivery_mode": entry.delivery_mode,
+                "meeting_link": entry.meeting_link,
             })
 
         return result, meta
@@ -506,6 +508,7 @@ class MasterTimetableService:
                     lecturer_name=entry.get("lecturer_name") or None,
                     course_title=entry.get("course_title") or None,
                     delivery_mode=entry.get("delivery_mode") or None,
+                    meeting_link=entry.get("meeting_link") or None,
                 )
                 for entry in level_entries
             ])
@@ -661,6 +664,7 @@ class MasterTimetableService:
                     lecturer_name=entry.get("lecturer_name") or None,
                     course_title=entry.get("course_title") or None,
                     delivery_mode=entry.get("delivery_mode") or None,
+                    meeting_link=entry.get("meeting_link") or None,
                 )
                 for entry in level_entries
             ])

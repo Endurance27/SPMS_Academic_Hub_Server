@@ -76,7 +76,10 @@ async def update_venue(
     db: AsyncSession = Depends(get_db)
 ):
     service = VenueService(db)
-    venue = await service.update_venue(venue_id, data)
+    try:
+        venue = await service.update_venue(venue_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
     if not venue:
         raise HTTPException(status_code=404, detail="Venue not found")
