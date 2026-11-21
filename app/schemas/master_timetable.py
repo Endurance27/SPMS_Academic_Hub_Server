@@ -1,7 +1,7 @@
 from enum import Enum
 from uuid import UUID
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class DeliveryMode(str, Enum):
@@ -23,6 +23,7 @@ class MasterEntryUpdate(BaseModel):
     lecturer_name: Optional[str] = None
     course_title: Optional[str] = None
     delivery_mode: Optional[DeliveryMode] = None
+    meeting_link: Optional[str] = Field(None, max_length=2048)
 
     @field_validator("day")
     @classmethod

@@ -483,6 +483,10 @@ async def update_entry(
         entry.course_title = updates["course_title"]
     if "delivery_mode" in updates:
         entry.delivery_mode = updates["delivery_mode"]
+    if "meeting_link" in updates:
+        entry.meeting_link = updates["meeting_link"]
+    if entry.is_free:
+        entry.meeting_link = None
 
     await db.commit()
     await db.refresh(entry)
@@ -512,6 +516,7 @@ async def update_entry(
         "lecturer_name": entry.lecturer_name,
         "course_title": entry.course_title,
         "delivery_mode": entry.delivery_mode,
+        "meeting_link": entry.meeting_link,
     }}
 
 
@@ -523,6 +528,7 @@ async def create_entry(
     period: int,
     subject: str,
     venue_code: str,
+    meeting_link: Optional[str] = Query(None, max_length=2048),
     current_user: User = Depends(require_permission("timetable.edit")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -549,11 +555,12 @@ async def create_entry(
         subject=normalised_subject,
         venue_code=venue_code.upper().strip(),
         is_free=normalised_subject == "FREE",
+        meeting_link=meeting_link if normalised_subject != "FREE" else None,
     )
     db.add(entry)
     await db.commit()
     await db.refresh(entry)
-    return {"data": {"id": str(entry.id), "subject": entry.subject, "venue_code": entry.venue_code}}
+    return {"data": {"id": str(entry.id), "subject": entry.subject, "venue_code": entry.venue_code, "meeting_link": entry.meeting_link}}
 
 
 @router.delete("/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
