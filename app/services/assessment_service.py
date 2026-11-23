@@ -67,6 +67,16 @@ class AssessmentService:
         - Department admin: may only create for their own department.
         - Super admin: unrestricted.
         """
+        # --- Parse date string → datetime ---
+        from datetime import datetime as dt
+        raw_date = data["date"]
+        if isinstance(raw_date, str):
+            try:
+                parsed_date = dt.fromisoformat(raw_date)
+            except ValueError:
+                raise ValueError(f"Invalid date format '{raw_date}'. Use YYYY-MM-DD.")
+        else:
+            parsed_date = raw_date
         # --- Ownership validation ---
         if user.role == UserRole.LECTURER:
             # Must belong to the target department
@@ -109,7 +119,7 @@ class AssessmentService:
             department_id=data["department_id"],
             assessment_type=data["assessment_type"],
             delivery_mode=data["delivery_mode"],
-            date=data["date"],
+            date=parsed_date,
             start_time=data["start_time"],
             end_time=data["end_time"],
             location=data["location"],
