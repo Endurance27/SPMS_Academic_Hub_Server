@@ -359,18 +359,29 @@ class SlotRequestService:
         return await self.approve_request(request_id, f"Override: {reason}", user)
 
     async def _get_free_cells(self, semester_id: uuid.UUID, level: Optional[int]) -> Dict:
-        """Get FREE cells from master timetable"""
-        from app.models.master_timetable import MasterEntry
+        """Get FREE cells from master timetable.
 
-        query = select(MasterEntry).where(
-            and_(
-                MasterEntry.semester_id == semester_id,
-                MasterEntry.is_free == True
+        MasterEntry has no semester_id — semester is on MasterTimetable.
+        We join through timetable_id and filter by MasterTimetable.semester_id.
+        Only master entries (department_id IS NULL) are used as the ground-truth
+        free cells; department overlays are not free-slot sources.
+        """
+        from app.models.master_timetable import MasterTimetable, MasterEntry as ME
+
+        query = (
+            select(ME)
+            .join(MasterTimetable, ME.timetable_id == MasterTimetable.id)
+            .where(
+                and_(
+                    MasterTimetable.semester_id == semester_id,
+                    ME.is_free == True,
+                    ME.department_id.is_(None),   # master entries only
+                )
             )
         )
 
         if level is not None:
-            query = query.where(MasterEntry.level == level)
+            query = query.where(ME.level == level)
 
         result = await self.db.execute(query)
         entries = result.scalars().all()
@@ -381,7 +392,7 @@ class SlotRequestService:
             free_cells[key] = {
                 "day": entry.day,
                 "period": entry.period,
-                "venue": entry.venue_code
+                "venue": entry.venue_code,
             }
 
         return free_cells

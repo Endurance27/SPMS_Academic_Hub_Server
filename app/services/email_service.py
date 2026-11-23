@@ -372,3 +372,114 @@ class EmailService:
         )
 
         return await self._send(to_email, user_name, subject, html_body, text_body)
+
+    # ------------------------------------------------------------------
+    # Assessment notification
+    # ------------------------------------------------------------------
+
+    async def send_assessment_notification_email(
+        self,
+        to_email: str,
+        student_name: str,
+        course_code: str,
+        course_title: str,
+        assessment_type: str,
+        delivery_mode: str,
+        assessment_date: str,
+        start_time: str,
+        end_time: str,
+        location: str,
+        venue_code: Optional[str] = None,
+    ) -> bool:
+        subject = f"Assessment Notice: {assessment_type} — {course_code}"
+
+        location_display = venue_code if venue_code else location
+
+        html_body = f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #0b3d91 0%, #1a56c4 100%); padding: 32px 40px; border-radius: 8px 8px 0 0;">
+                <h1 style="color: #ffffff; font-size: 20px; font-weight: 600; margin: 0;">{self._sender_name}</h1>
+                <p style="color: rgba(255,255,255,0.8); font-size: 13px; margin: 4px 0 0;">School of Physical and Mathematical Sciences</p>
+            </div>
+
+            <!-- Body -->
+            <div style="padding: 32px 40px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
+                <h2 style="color: #1a365d; font-size: 22px; margin: 0 0 8px;">Assessment Notice</h2>
+                <p style="color: #475569; line-height: 1.7; font-size: 15px; margin: 16px 0 4px;">
+                    Hello {student_name},
+                </p>
+                <p style="color: #475569; line-height: 1.7; font-size: 15px; margin: 0 0 24px;">
+                    An assessment has been scheduled for one of your courses. Please review the details below.
+                </p>
+
+                <!-- Assessment Details Card -->
+                <div style="background: #f8f9fc; border-radius: 8px; padding: 24px; margin: 0 0 24px; border: 1px solid #e2e8f0;">
+                    <p style="color: #1a365d; font-weight: 700; font-size: 16px; margin: 0 0 20px;">
+                        {assessment_type} &mdash; {course_code}
+                    </p>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 10px 0; color: #64748b; font-size: 13px; width: 150px; vertical-align: top;">Course</td>
+                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px; font-weight: 500;">{course_code} &mdash; {course_title}</td>
+                        </tr>
+                        <tr style="border-top: 1px solid #e2e8f0;">
+                            <td style="padding: 10px 0; color: #64748b; font-size: 13px; vertical-align: top;">Assessment Type</td>
+                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px;">{assessment_type}</td>
+                        </tr>
+                        <tr style="border-top: 1px solid #e2e8f0;">
+                            <td style="padding: 10px 0; color: #64748b; font-size: 13px; vertical-align: top;">Delivery Mode</td>
+                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px;">{delivery_mode}</td>
+                        </tr>
+                        <tr style="border-top: 1px solid #e2e8f0;">
+                            <td style="padding: 10px 0; color: #64748b; font-size: 13px; vertical-align: top;">Date</td>
+                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px; font-weight: 600;">{assessment_date}</td>
+                        </tr>
+                        <tr style="border-top: 1px solid #e2e8f0;">
+                            <td style="padding: 10px 0; color: #64748b; font-size: 13px; vertical-align: top;">Time</td>
+                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px; font-weight: 600;">{start_time} &ndash; {end_time}</td>
+                        </tr>
+                        <tr style="border-top: 1px solid #e2e8f0;">
+                            <td style="padding: 10px 0; color: #64748b; font-size: 13px; vertical-align: top;">Venue</td>
+                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px;">{location_display}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Notice -->
+                <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 0 6px 6px 0;">
+                    <p style="color: #1e40af; font-weight: 600; font-size: 13px; margin: 0 0 4px;">Important</p>
+                    <p style="color: #1e3a8a; font-size: 13px; margin: 0; line-height: 1.5;">
+                        Please arrive at least 10 minutes before the start time. Bring your student ID.
+                        Any changes to this assessment will be communicated separately.
+                    </p>
+                </div>
+
+                <p style="color: #94a3b8; font-size: 13px; text-align: center; margin: 24px 0 0;">
+                    Log in to the {self._sender_name} portal to view full details.
+                </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align: center; padding: 20px 40px;">
+                <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                    &copy; {self._sender_name}. All rights reserved.
+                </p>
+            </div>
+        </div>
+        """
+
+        text_body = (
+            f"Hello {student_name},\n\n"
+            f"An assessment has been scheduled for one of your courses.\n\n"
+            f"Course:          {course_code} — {course_title}\n"
+            f"Assessment Type: {assessment_type}\n"
+            f"Delivery Mode:   {delivery_mode}\n"
+            f"Date:            {assessment_date}\n"
+            f"Time:            {start_time} – {end_time}\n"
+            f"Venue:           {location_display}\n\n"
+            f"Please arrive at least 10 minutes before the start time and bring your student ID.\n\n"
+            f"Log in to the {self._sender_name} portal to view full details."
+        )
+
+        return await self._send(to_email, student_name, subject, html_body, text_body)

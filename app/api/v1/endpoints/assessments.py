@@ -55,9 +55,23 @@ async def create_assessment(
     current_user: User = Depends(require_permission("assessments.submit")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create assessment"""
+    """Create an assessment.
+
+    **Who can create:**
+    - **Lecturer** — for courses they are assigned to teach, within their own department.
+      Saving without draft creates a *Submitted* assessment that goes to the department for review.
+    - **Department admin** — for any course in their own department.
+      Saving without draft creates an *Upcoming* assessment (no separate approval required).
+    - **Super admin** — for any department and any scope.
+      Always creates an *Upcoming* assessment.
+
+    Pass `?save_as_draft=true` to save without submitting for any role.
+    """
     service = AssessmentService(db)
-    return await service.create_assessment(data.model_dump(), save_as_draft, current_user)
+    try:
+        return await service.create_assessment(data.model_dump(), save_as_draft, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.get("/{assessment_id}", response_model=AssessmentResponse)
@@ -83,7 +97,10 @@ async def update_assessment(
 ):
     """Update assessment"""
     service = AssessmentService(db)
-    return await service.update_assessment(assessment_id, data.model_dump(exclude_unset=True), current_user)
+    try:
+        return await service.update_assessment(assessment_id, data.model_dump(exclude_unset=True), current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/{assessment_id}/submit", response_model=AssessmentResponse)
@@ -94,7 +111,10 @@ async def submit_assessment(
 ):
     """Submit assessment for review"""
     service = AssessmentService(db)
-    return await service.submit_assessment(assessment_id, current_user)
+    try:
+        return await service.submit_assessment(assessment_id, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/{assessment_id}/approve", response_model=AssessmentResponse)
@@ -103,9 +123,12 @@ async def approve_assessment(
     current_user: User = Depends(require_permission("assessments.review")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Approve assessment"""
+    """Approve a submitted assessment. Triggers email notification to all enrolled students."""
     service = AssessmentService(db)
-    return await service.approve_assessment(assessment_id, current_user)
+    try:
+        return await service.approve_assessment(assessment_id, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/{assessment_id}/return", response_model=AssessmentResponse)
@@ -115,9 +138,12 @@ async def return_assessment(
     current_user: User = Depends(require_permission("assessments.review")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Return assessment with comment"""
+    """Return a submitted assessment with a mandatory review comment."""
     service = AssessmentService(db)
-    return await service.return_assessment(assessment_id, comment, current_user)
+    try:
+        return await service.return_assessment(assessment_id, comment, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/{assessment_id}/cancel", response_model=AssessmentResponse)

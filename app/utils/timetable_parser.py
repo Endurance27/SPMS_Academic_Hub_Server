@@ -292,17 +292,36 @@ class TimetableParser:
                 subj_raw = row[subj_col] if subj_col < len(row) else None
                 venue_raw = row[venue_col] if venue_col < len(row) else None
 
-                if subj_raw is None or str(subj_raw).strip() == "":
+                subject_text = str(subj_raw).strip() if subj_raw is not None else ""
+                venue_text = str(venue_raw).strip() if venue_raw is not None else ""
+
+                # A blank subject with a venue present means the slot is free.
+                # Store it as a FREE entry so slot-request clash detection works.
+                if not subject_text:
+                    if venue_text:
+                        venue_text = _strip_lecturer_from_venue(venue_text)
+                        venue = _normalize_venue(venue_text)
+                        entry_level = level
+                        if infer_level:
+                            entry_level = 0
+                        self.entries.append({
+                            "level": entry_level,
+                            "day": day_idx,
+                            "period": current_period,
+                            "subject": "FREE",
+                            "venue_code": venue,
+                            "is_free": True,
+                            "course_kind": None,
+                        })
                     continue
 
-                subject = _normalize_subject(str(subj_raw))
+                subject = _normalize_subject(subject_text)
 
                 # Skip non-course entries (lecturer names, labels, level headers)
                 if infer_level and not re.match(r"^[A-Z]{2,6}\s*\d{3}", subject):
                     continue
 
                 # Clean venue: strip lecturer initials in parentheses, then normalise
-                venue_text = str(venue_raw).strip() if venue_raw and str(venue_raw).strip() else ""
                 if venue_text:
                     venue_text = _strip_lecturer_from_venue(venue_text)
                 venue = _normalize_venue(venue_text) if venue_text else ""
