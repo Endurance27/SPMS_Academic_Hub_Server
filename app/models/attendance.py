@@ -36,7 +36,7 @@ class AttendanceSession(Base):
     start_time = Column(String(5), nullable=False)
     end_time = Column(String(5), nullable=False)
     venue_code = Column(String(50))
-    status = Column(Enum(AttendanceStatus), default=AttendanceStatus.SCHEDULED)
+    status = Column(Enum(AttendanceStatus, name="attendancesessionstatus"), default=AttendanceStatus.SCHEDULED)
     opened_at = Column(DateTime(timezone=True))
     closed_at = Column(DateTime(timezone=True))
     qr_secret = Column(String(100))
