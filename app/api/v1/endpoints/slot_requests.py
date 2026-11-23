@@ -49,7 +49,17 @@ async def check_slot_request(
     """Check for clashes before submitting slot request"""
     service = SlotRequestService(db)
     clashes = await service.check_clashes(data.model_dump(), current_user)
-    return {"clashes": clashes, "blocking": any(c.severity == "danger" for c in clashes)}
+    serialized = [
+        {
+            "kind": c.kind,
+            "severity": c.severity,
+            "message": c.message,
+            "other_request_id": c.other_request_id,
+            "other_schedule_item_id": c.other_schedule_item_id,
+        }
+        for c in clashes
+    ]
+    return {"clashes": serialized, "blocking": any(c.severity == "danger" for c in clashes)}
 
 
 @router.post("", response_model=SlotRequestResponse, status_code=status.HTTP_201_CREATED)
@@ -67,7 +77,19 @@ async def create_slot_request(
     if any(c.severity == "danger" for c in clashes):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"code": "CLASH_BLOCKED", "clashes": clashes}
+            detail={
+                "code": "CLASH_BLOCKED",
+                "clashes": [
+                    {
+                        "kind": c.kind,
+                        "severity": c.severity,
+                        "message": c.message,
+                        "other_request_id": c.other_request_id,
+                        "other_schedule_item_id": c.other_schedule_item_id,
+                    }
+                    for c in clashes
+                ],
+            },
         )
 
     request = await service.create_request(data_dict, current_user)

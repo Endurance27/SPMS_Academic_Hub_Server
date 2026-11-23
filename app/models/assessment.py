@@ -19,9 +19,10 @@ class AssessmentType(str, enum.Enum):
 
 
 class DeliveryMode(str, enum.Enum):
-    IN_PERSON = "In-person"
-    ONLINE = "Online"
-    HYBRID = "Hybrid"
+    IN_PERSON = "IN_PERSON"
+    ONLINE = "ONLINE"
+    TAKE_HOME_ASSIGNMENT = "TAKE_HOME_ASSIGNMENT"
+    TERM_PAPER = "TERM_PAPER"
 
 
 class AssessmentStatus(str, enum.Enum):
